@@ -24,6 +24,16 @@ enum NetworkTransport: Equatable, Sendable {
     case none
 }
 
+/// A tethered connection shared from a phone or tablet.
+enum NetworkHotspot: Equatable, Sendable {
+    /// Personal Hotspot joined over Wi-Fi (NWPath reports it as expensive).
+    case wifi
+    /// iPhone or iPad tethered over USB.
+    case usb
+    /// Tethering over a Bluetooth PAN connection.
+    case bluetooth
+}
+
 struct NetworkStatus: Equatable, Sendable {
     var isAvailable: Bool
     var isConnected: Bool
@@ -32,6 +42,7 @@ struct NetworkStatus: Equatable, Sendable {
     var isWiFiPoweredOn: Bool?
     var ssid: String?
     var rssi: Int?
+    var hotspot: NetworkHotspot? = nil
 
     static let unavailable = NetworkStatus(
         isAvailable: false,

@@ -3,6 +3,7 @@ import AppKit
 @preconcurrency import CoreWLAN
 import Foundation
 @preconcurrency import Network
+import SystemConfiguration
 
 @MainActor
 final class NetworkService: NSObject, @preconcurrency CLLocationManagerDelegate {
@@ -123,7 +124,8 @@ final class NetworkService: NSObject, @preconcurrency CLLocationManagerDelegate 
             interfaceName: activeInterface?.name,
             isWiFiPoweredOn: wifiPoweredOn,
             ssid: ssid,
-            rssi: rssi
+            rssi: rssi,
+            hotspot: resolvedHotspot(path: path, activeInterface: activeInterface, transport: transport)
         )
         publish(status)
 
@@ -210,6 +212,29 @@ final class NetworkService: NSObject, @preconcurrency CLLocationManagerDelegate 
         case .some: return .other
         case .none: return .none
         }
+    }
+
+    private func resolvedHotspot(
+        path: NWPath,
+        activeInterface: NWInterface?,
+        transport: NetworkTransport
+    ) -> NetworkHotspot? {
+        guard path.status == .satisfied, let name = activeInterface?.name else { return nil }
+        // USB and Bluetooth tethering appear as their own hardware ports
+        // ("iPhone USB", "Bluetooth PAN"), so the port name identifies them.
+        if let port = Self.hardwarePortName(forBSDName: name)?.lowercased() {
+            if port.contains("iphone") || port.contains("ipad") { return .usb }
+            if port.contains("bluetooth pan") { return .bluetooth }
+        }
+        // macOS flags a joined Personal Hotspot Wi-Fi network as expensive.
+        if transport == .wifi, path.isExpensive { return .wifi }
+        return nil
+    }
+
+    private static func hardwarePortName(forBSDName name: String) -> String? {
+        guard let interfaces = SCNetworkInterfaceCopyAll() as? [SCNetworkInterface] else { return nil }
+        let match = interfaces.first { SCNetworkInterfaceGetBSDName($0) as String? == name }
+        return match.flatMap { SCNetworkInterfaceGetLocalizedDisplayName($0) as String? }
     }
 
     private func publish(_ status: NetworkStatus) {

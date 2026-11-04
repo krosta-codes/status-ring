@@ -181,13 +181,16 @@ struct DuoStatusView: View {
 
     private var accessibilitySummary: String {
         let network: String
-        switch statusStore.status.network.transport {
+        let status = statusStore.status.network
+        switch status.transport {
+        case _ where status.isConnected && status.hotspot != nil:
+            network = localized("Personal Hotspot connected")
         case .ethernet:
-            network = statusStore.status.network.isConnected ? localized("Ethernet connected") : localized("Ethernet disconnected")
+            network = status.isConnected ? localized("Ethernet connected") : localized("Ethernet disconnected")
         case .wifi:
-            network = statusStore.status.network.isConnected ? localized("Wi-Fi connected") : localized("Wi-Fi disconnected")
+            network = status.isConnected ? localized("Wi-Fi connected") : localized("Wi-Fi disconnected")
         case .other, .none:
-            network = statusStore.status.network.isConnected ? localized("Network connected") : localized("Network disconnected")
+            network = status.isConnected ? localized("Network connected") : localized("Network disconnected")
         }
         let volume: String
         if statusStore.status.audio.volume.isMuted {

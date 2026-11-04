@@ -193,6 +193,7 @@ struct StatusPopoverView: View {
     private var networkSymbol: String {
         let network = statusStore.status.network
         guard network.isConnected else { return "network.slash" }
+        if network.hotspot != nil { return "personalhotspot" }
         switch network.transport {
         case .wifi: return "wifi"
         case .ethernet: return "cable.connector.horizontal"
@@ -209,6 +210,12 @@ struct StatusPopoverView: View {
         guard network.isAvailable else { return localized("No network interface") }
         guard network.isConnected else {
             return network.isWiFiPoweredOn == false ? localized("Wi-Fi disabled") : localized("Not connected")
+        }
+        switch network.hotspot {
+        case .usb: return localized("Personal Hotspot via USB")
+        case .bluetooth: return localized("Personal Hotspot via Bluetooth")
+        case .wifi: return network.ssid ?? localized("Personal Hotspot")
+        case nil: break
         }
         switch network.transport {
         case .wifi: return network.ssid ?? localized("Network name unavailable")
@@ -231,6 +238,7 @@ struct StatusPopoverView: View {
         guard network.isAvailable else { return localized("Unavailable") }
         if network.isWiFiPoweredOn == false, !network.isConnected { return localized("Off") }
         guard network.isConnected else { return localized("Offline") }
+        if network.hotspot != nil { return localized("Hotspot") }
         switch network.transport {
         case .wifi: return localized("Wi-Fi")
         case .ethernet: return localized("Ethernet")

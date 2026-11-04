@@ -100,3 +100,8 @@
 "Extra Large" = "ใหญ่พิเศษ";
 "Battery Percentage" = "เปอร์เซ็นต์แบตเตอรี่";
 "Default" = "ค่าเริ่มต้น";
+"Personal Hotspot" = "ฮอตสปอตส่วนบุคคล";
+"Personal Hotspot via USB" = "ฮอตสปอตส่วนบุคคลผ่าน USB";
+"Personal Hotspot via Bluetooth" = "ฮอตสปอตส่วนบุคคลผ่าน Bluetooth";
+"Hotspot" = "ฮอตสปอต";
+"Personal Hotspot connected" = "เชื่อมต่อฮอตสปอตส่วนบุคคลแล้ว";

@@ -135,3 +135,8 @@
 "Select audio input" = "选择音频输入";
 "Extra Large" = "超大";
 "Battery Percentage" = "电池百分比";
+"Personal Hotspot" = "个人热点";
+"Personal Hotspot via USB" = "个人热点（USB）";
+"Personal Hotspot via Bluetooth" = "个人热点（蓝牙）";
+"Hotspot" = "热点";
+"Personal Hotspot connected" = "个人热点已连接";

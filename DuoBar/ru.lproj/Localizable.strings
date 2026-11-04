@@ -135,3 +135,8 @@
 "Select audio input" = "Выбрать устройство ввода звука";
 "Extra Large" = "Очень большой";
 "Battery Percentage" = "Процент заряда";
+"Personal Hotspot" = "Режим модема";
+"Personal Hotspot via USB" = "Режим модема через USB";
+"Personal Hotspot via Bluetooth" = "Режим модема через Bluetooth";
+"Hotspot" = "Модем";
+"Personal Hotspot connected" = "Режим модема подключён";
