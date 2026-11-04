@@ -8,11 +8,27 @@ struct StatusPopoverView: View {
     @AppStorage(PreferenceKeys.batteryColorCoding) private var batteryColorCoding = false
     @State private var detail: PopoverDetail?
     @State private var mainContentSize: CGSize = .zero
+    @ObservedObject private var commandKey = CommandKeyMonitor.shared
+    @StateObject private var moduleOrder = ReorderController(
+        axis: .vertical,
+        order: PopoverModule.storedOrder(),
+        onOrderChange: PopoverModule.storeOrder
+    )
+    @StateObject private var tileOrder = ReorderController(
+        axis: .horizontal,
+        order: SystemStatTile.storedOrder(),
+        onOrderChange: SystemStatTile.storeOrder
+    )
     private let onClose: () -> Void
 
     init(statusStore: SystemStatusStore, onClose: @escaping () -> Void) {
         self.statusStore = statusStore
         self.onClose = onClose
+    }
+
+    /// Holding ⌘ lets the modules and the stat tiles be dragged into a new order.
+    private var isReordering: Bool {
+        commandKey.isPressed && detail == nil
     }
 
     var body: some View {
@@ -55,62 +71,11 @@ struct StatusPopoverView: View {
 
     private var panelContent: some View {
         VStack(spacing: 8) {
-            StatusRow(
-                symbol: networkSymbol,
-                title: localized("Network"),
-                detail: networkDetail,
-                speedText: networkSpeedText,
-                stateText: networkState,
-                tint: .primary,
-                isIconActive: statusStore.status.network.isConnected,
-                accessory: .disclosure,
-                trailing: wifiPowerToggle,
-                onActivate: { showDetail(.network) },
-                activationHint: localized("Browse nearby Wi-Fi networks")
-            )
-
-            VolumeStatusRow(
-                volume: statusStore.status.audio.volume,
-                hasOutputDevice: statusStore.status.audio.defaultOutput != nil,
-                playbackDeviceIdentifier: statusStore.status.audio.defaultOutput?.uid,
-                onSetVolume: statusStore.setVolume,
-                onSetMuted: statusStore.setMuted
-            )
-
-            Button(action: openBatterySettings) {
-                BatteryStatusRow(
-                    battery: statusStore.status.battery,
-                    showPercentage: showBatteryPercentage,
-                    showsDisclosure: true,
-                    timeEstimate: statusStore.batteryTimeEstimate
-                )
-            }
-            .buttonStyle(.plain)
-            .frame(maxWidth: .infinity)
-            .accessibilityHint(localized("Open Battery Settings"))
-
-            SystemStatsTiles(stats: statusStore.systemStats)
-
-            StatusRow(
-                symbol: audioOutputSymbol,
-                title: localized("Audio Output"),
-                detail: audioOutputDetail,
-                stateText: audioOutputState,
-                tint: .primary,
-                accessory: .disclosure,
-                onActivate: { showDetail(.output) },
-                activationHint: localized("Select audio output")
-            )
-
-            StatusRow(
-                symbol: audioInputSymbol,
-                title: localized("Audio Input"),
-                detail: audioInputDetail,
-                stateText: audioInputState,
-                tint: .primary,
-                accessory: .disclosure,
-                onActivate: { showDetail(.input) },
-                activationHint: localized("Select audio input")
+            ReorderableStack(
+                controller: moduleOrder,
+                isEditing: isReordering,
+                catchesDrag: { $0 != .systemStats },
+                content: module
             )
 
             #if DEBUG
@@ -139,6 +104,89 @@ struct StatusPopoverView: View {
         .frame(width: 312)
         .onAppear {
             NSApp.activate(ignoringOtherApps: true)
+            commandKey.start()
+        }
+        .onChange(of: presentation.isShown) { isShown in
+            if isShown { commandKey.start() }
+        }
+    }
+
+    @ViewBuilder
+    private func module(_ module: PopoverModule) -> some View {
+        switch module {
+        case .network:
+            StatusRow(
+                symbol: networkSymbol,
+                title: localized("Network"),
+                detail: networkDetail,
+                speedText: networkSpeedText,
+                stateText: networkState,
+                tint: .primary,
+                isIconActive: statusStore.status.network.isConnected,
+                accessory: .disclosure,
+                trailing: wifiPowerToggle,
+                onActivate: { showDetail(.network) },
+                activationHint: localized("Browse nearby Wi-Fi networks")
+            )
+        case .volume:
+            VolumeStatusRow(
+                volume: statusStore.status.audio.volume,
+                hasOutputDevice: statusStore.status.audio.defaultOutput != nil,
+                playbackDeviceIdentifier: statusStore.status.audio.defaultOutput?.uid,
+                onSetVolume: statusStore.setVolume,
+                onSetMuted: statusStore.setMuted
+            )
+        case .battery:
+            Button(action: openBatterySettings) {
+                BatteryStatusRow(
+                    battery: statusStore.status.battery,
+                    showPercentage: showBatteryPercentage,
+                    showsDisclosure: true,
+                    timeEstimate: statusStore.batteryTimeEstimate
+                )
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity)
+            .accessibilityHint(localized("Open Battery Settings"))
+        case .systemStats:
+            ReorderableStack(
+                controller: tileOrder,
+                isEditing: isReordering,
+                crossAxis: CrossAxisDragForwarder(
+                    changed: { value in
+                        moduleOrder.dragChanged(
+                            .systemStats,
+                            location: value.location,
+                            startLocation: value.startLocation
+                        )
+                    },
+                    ended: { moduleOrder.dragEnded() }
+                )
+            ) { tile in
+                SystemStatTileView(tile: tile, stats: statusStore.systemStats)
+            }
+        case .audioOutput:
+            StatusRow(
+                symbol: audioOutputSymbol,
+                title: localized("Audio Output"),
+                detail: audioOutputDetail,
+                stateText: audioOutputState,
+                tint: .primary,
+                accessory: .disclosure,
+                onActivate: { showDetail(.output) },
+                activationHint: localized("Select audio output")
+            )
+        case .audioInput:
+            StatusRow(
+                symbol: audioInputSymbol,
+                title: localized("Audio Input"),
+                detail: audioInputDetail,
+                stateText: audioInputState,
+                tint: .primary,
+                accessory: .disclosure,
+                onActivate: { showDetail(.input) },
+                activationHint: localized("Select audio input")
+            )
         }
     }
 

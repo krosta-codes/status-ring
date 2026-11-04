@@ -1,23 +1,27 @@
 import SwiftUI
 
-/// Three square Control Center style modules: CPU, Memory, Storage.
-struct SystemStatsTiles: View {
+/// Square Control Center style modules for CPU, Memory and Storage.
+struct SystemStatTileView: View {
+    let tile: SystemStatTile
     let stats: SystemStats?
 
     var body: some View {
-        HStack(spacing: 8) {
+        switch tile {
+        case .cpu:
             SquareStatTile(
                 symbol: "cpu",
                 title: localized("CPU"),
                 value: stats?.cpuPercent.map { localized("%d%%", $0) } ?? "–",
                 detail: localized("Load")
             )
+        case .memory:
             SquareStatTile(
                 symbol: "memorychip",
                 title: localized("Memory"),
                 value: stats?.memoryPercent.map { localized("%d%%", $0) } ?? "–",
                 detail: stats.map { localized("%@ used", Self.binaryGigabytes($0.memoryUsedBytes)) } ?? ""
             )
+        case .storage:
             SquareStatTile(
                 symbol: "internaldrive",
                 title: localized("Storage"),
