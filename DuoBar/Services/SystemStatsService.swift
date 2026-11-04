@@ -22,6 +22,8 @@ final class SystemStatsService {
 
     private var timer: Timer?
     private var previousCPU: host_cpu_load_info?
+    /// Kept so the tiles never flash a dash while closing or right after opening.
+    private var lastCPUPercent: Int?
     private let memoryTotal: UInt64 = {
         var total: UInt64 = 0
         var size = MemoryLayout<UInt64>.size
@@ -46,7 +48,6 @@ final class SystemStatsService {
         timer?.invalidate()
         timer = nil
         previousCPU = nil
-        onStatsChange?(nil)
     }
 
     private func sample(includeCPU: Bool = true) {
@@ -60,11 +61,12 @@ final class SystemStatsService {
             let total = busy + idle
             cpuPercent = total > 0 ? Int((busy / total * 100).rounded()) : nil
             previousCPU = current
+            lastCPUPercent = cpuPercent
         }
         let storage = Self.storage()
         onStatsChange?(
             SystemStats(
-                cpuPercent: cpuPercent,
+                cpuPercent: cpuPercent ?? lastCPUPercent,
                 memoryUsedBytes: Self.memoryUsed(),
                 memoryTotalBytes: memoryTotal,
                 storageAvailableBytes: storage.available,

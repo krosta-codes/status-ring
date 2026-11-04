@@ -15,5 +15,8 @@ cp "$REF_APP/Contents/Resources/Assets.car" "$REF_APP/Contents/Resources/AppIcon
 for d in DuoBar/*.lproj; do cp -R "$d" "$APP/Contents/Resources/"; done
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.4.0-hotspot" "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 9" "$APP/Contents/Info.plist"
-codesign --force --sign - --entitlements DuoBar/DuoBar.entitlements "$APP"
+# A stable local identity keeps macOS permissions (Location, Bluetooth,
+# Accessibility) across rebuilds; ad-hoc signatures change with every build.
+IDENTITY=$(security find-identity -p codesigning | awk '/"DuoBar Local Signing"/ {print $2; exit}')
+codesign --force --sign "${IDENTITY:--}" --entitlements DuoBar/DuoBar.entitlements "$APP"
 echo "Built $APP"

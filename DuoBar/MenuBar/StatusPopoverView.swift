@@ -67,7 +67,13 @@ struct StatusPopoverView: View {
             }
         }
         .onChange(of: presentation.isShown) { isShown in
-            if !isShown { detail = nil }
+            if !isShown {
+                detail = nil
+                presentation.isDetailOpen = false
+            }
+        }
+        .onChange(of: presentation.retractRequest) { _ in
+            showDetail(nil)
         }
         .opacity(presentation.isShown ? 1 : 0)
         .animation(presentation.isShown ? PopoverMotion.openOpacity : PopoverMotion.close, value: presentation.isShown)
@@ -261,9 +267,10 @@ struct StatusPopoverView: View {
     }
 
     private func showDetail(_ newDetail: PopoverDetail?) {
-        withAnimation(.spring(duration: 0.38, bounce: 0.12)) {
+        withAnimation(PopoverMotion.detail) {
             detail = newDetail
         }
+        presentation.isDetailOpen = newDetail != nil
     }
 
     @ViewBuilder

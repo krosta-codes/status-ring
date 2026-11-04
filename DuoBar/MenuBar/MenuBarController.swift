@@ -377,20 +377,35 @@ extension MenuBarController {
         guard isPanelVisible else { return }
         isClosing = true
         lastDismissUptime = ProcessInfo.processInfo.systemUptime
-        PopoverPresentationState.shared.hide()
         removeOutsideClickMonitors()
         statusStore.setPopoverActive(false)
         perform(hoverInteraction.popoverClosedExternally())
-        // Keep the window up until the fade-out has finished.
-        let work = DispatchWorkItem { [weak self] in
+
+        // An expanded module retracts into its slot first, then the popover fades.
+        let retractDelay = PopoverPresentationState.shared.retractDetailIfNeeded()
+            ? PopoverMotion.retractDuration
+            : 0
+        let fade = DispatchWorkItem { [weak self] in
             Task { @MainActor in
                 guard let self, self.isClosing else { return }
-                self.isClosing = false
-                self.panel?.orderOut(nil)
+                PopoverPresentationState.shared.hide()
+                // Keep the window up until the fade-out has finished.
+                let orderOut = DispatchWorkItem { [weak self] in
+                    Task { @MainActor in
+                        guard let self, self.isClosing else { return }
+                        self.isClosing = false
+                        self.panel?.orderOut(nil)
+                    }
+                }
+                self.closeWorkItem = orderOut
+                DispatchQueue.main.asyncAfter(
+                    deadline: .now() + PopoverMotion.closeDuration + 0.03,
+                    execute: orderOut
+                )
             }
         }
-        closeWorkItem = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + PopoverMotion.closeDuration + 0.03, execute: work)
+        closeWorkItem = fade
+        DispatchQueue.main.asyncAfter(deadline: .now() + retractDelay, execute: fade)
     }
 
     /// Stands in for `.transient`: closes when key moves to another window of
