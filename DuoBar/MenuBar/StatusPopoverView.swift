@@ -6,6 +6,7 @@ struct StatusPopoverView: View {
     @ObservedObject private var presentation = PopoverPresentationState.shared
     @AppStorage(PreferenceKeys.showBatteryPercentage) private var showBatteryPercentage = true
     @AppStorage(PreferenceKeys.batteryColorCoding) private var batteryColorCoding = false
+    @State private var showsNearbyNetworks = false
     private let onClose: () -> Void
 
     init(statusStore: SystemStatusStore, onClose: @escaping () -> Void) {
@@ -15,7 +16,30 @@ struct StatusPopoverView: View {
 
     var body: some View {
         PopoverGlassContainer {
-            panelContent
+            // The main content stays laid out underneath so the panel keeps its
+            // size; Nearby Networks takes over the whole panel like the Wi-Fi
+            // detail view in Control Center.
+            ZStack {
+                panelContent
+                    .opacity(showsNearbyNetworks ? 0 : 1)
+                    .allowsHitTesting(!showsNearbyNetworks)
+                    .accessibilityHidden(showsNearbyNetworks)
+
+                if showsNearbyNetworks {
+                    NearbyWiFiPanelView(
+                        statusStore: statusStore,
+                        wifiPowerToggle: wifiPowerToggle,
+                        onBack: { setNearbyNetworksShown(false) },
+                        onOpenSettings: openWiFiSettings
+                    )
+                    .padding(12)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                }
+            }
+        }
+        .onChange(of: presentation.isShown) { isShown in
+            if !isShown { showsNearbyNetworks = false }
         }
         .opacity(presentation.isShown ? 1 : 0)
         .animation(presentation.isShown ? PopoverMotion.openOpacity : PopoverMotion.close, value: presentation.isShown)
@@ -38,10 +62,9 @@ struct StatusPopoverView: View {
                 activationHint: networkSettingsHint
             )
 
-            NearbyWiFiButton(
-                statusStore: statusStore,
-                onOpenSettings: openWiFiSettings
-            )
+            NearbyWiFiButton {
+                setNearbyNetworksShown(true)
+            }
 
             VolumeStatusRow(
                 volume: statusStore.status.audio.volume,
@@ -173,6 +196,12 @@ struct StatusPopoverView: View {
     private func openNetworkSettings() {
         _ = SystemSettingsOpener.open(SystemSettingsOpener.pane(for: statusStore.status.network))
         onClose()
+    }
+
+    private func setNearbyNetworksShown(_ shown: Bool) {
+        withAnimation(.easeInOut(duration: 0.22)) {
+            showsNearbyNetworks = shown
+        }
     }
 
     private func openWiFiSettings() {

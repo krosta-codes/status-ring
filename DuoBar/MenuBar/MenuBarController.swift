@@ -10,6 +10,7 @@ final class MenuBarController: NSObject {
     private var hostingController: NSHostingController<StatusPopoverView>?
     private var isClosing = false
     private var closeWorkItem: DispatchWorkItem?
+    private var lastDismissUptime: TimeInterval = 0
     private var isPanelVisible: Bool { panel?.isVisible == true && !isClosing }
     private let statusStore: SystemStatusStore
     private var hostingView: PassthroughHostingView<DuoStatusView>?
@@ -104,6 +105,12 @@ final class MenuBarController: NSObject {
     }
 
     @objc private func togglePopover() {
+        // Pressing the status item takes key focus from the panel, which closes
+        // it before this mouse-up action arrives. Without this guard the same
+        // click would immediately reopen the popover.
+        if !isPanelVisible, ProcessInfo.processInfo.systemUptime - lastDismissUptime < 0.4 {
+            return
+        }
         // Never trust the state machine over what is actually on screen.
         if isPanelVisible {
             hoverInteraction.popoverShownExternally()
@@ -369,6 +376,7 @@ extension MenuBarController {
     func dismissPanel() {
         guard isPanelVisible else { return }
         isClosing = true
+        lastDismissUptime = ProcessInfo.processInfo.systemUptime
         PopoverPresentationState.shared.hide()
         removeOutsideClickMonitors()
         statusStore.setPopoverActive(false)

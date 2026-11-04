@@ -1,15 +1,10 @@
 import SwiftUI
 
 struct NearbyWiFiButton: View {
-    let statusStore: SystemStatusStore
-    let onOpenSettings: () -> Void
-
-    @State private var isPresented = false
+    let onOpen: () -> Void
 
     var body: some View {
-        Button {
-            isPresented = true
-        } label: {
+        Button(action: onOpen) {
             HStack(spacing: 8) {
                 Label(localized("Nearby Networks"), systemImage: "wifi")
                     .font(.system(size: 10.5, weight: .medium))
@@ -25,67 +20,91 @@ struct NearbyWiFiButton: View {
         .frame(height: 28)
         .popoverCardBackground(cornerRadius: 8, fillOpacity: 0.03)
         .accessibilityHint(localized("Browse nearby Wi-Fi networks"))
-        .popover(isPresented: $isPresented, arrowEdge: .trailing) {
-            NearbyWiFiPopoverView(
-                statusStore: statusStore,
-                onOpenSettings: {
-                    isPresented = false
-                    onOpenSettings()
-                }
-            )
-        }
     }
 }
 
-private struct NearbyWiFiPopoverView: View {
+/// Fills the whole popover panel, like the Wi-Fi detail view in Control Center.
+struct NearbyWiFiPanelView: View {
     let statusStore: SystemStatusStore
+    let wifiPowerToggle: AnyView?
+    let onBack: () -> Void
     let onOpenSettings: () -> Void
 
     @ObservedObject private var controller: NearbyWiFiController
     @State private var passwordNetwork: NearbyWiFiNetwork?
     @State private var password = ""
 
-    init(statusStore: SystemStatusStore, onOpenSettings: @escaping () -> Void) {
+    init(
+        statusStore: SystemStatusStore,
+        wifiPowerToggle: AnyView?,
+        onBack: @escaping () -> Void,
+        onOpenSettings: @escaping () -> Void
+    ) {
         self.statusStore = statusStore
+        self.wifiPowerToggle = wifiPowerToggle
+        self.onBack = onBack
         self.onOpenSettings = onOpenSettings
         controller = statusStore.nearbyWiFiController
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(localized("Nearby Networks"))
+            HStack(spacing: 6) {
+                Button(action: onBack) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 12, weight: .semibold))
+                        .frame(width: 22, height: 22)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
+                .accessibilityLabel(localized("Back"))
+
+                Text(localized("Wi-Fi"))
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
-                Spacer()
+
                 if controller.state == .scanning {
                     ProgressView()
                         .controlSize(.small)
                         .accessibilityLabel(localized("Scanning…"))
                 }
-            }
-
-            Divider()
-
-            content
-
-            Divider()
-
-            HStack {
-                Button {
-                    Task { await statusStore.refreshNearbyWiFi() }
-                } label: {
-                    Label(localized("Refresh"), systemImage: "arrow.clockwise")
-                }
-                .disabled(controller.isBusy || controller.isWiFiPoweredOn == false)
 
                 Spacer()
 
-                Button(localized("Network Settings…"), action: onOpenSettings)
+                Button {
+                    Task { await statusStore.refreshNearbyWiFi() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 11, weight: .semibold))
+                        .frame(width: 22, height: 22)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(controller.isBusy || controller.isWiFiPoweredOn == false)
+                .accessibilityLabel(localized("Refresh"))
+
+                if let wifiPowerToggle { wifiPowerToggle }
             }
-            .controlSize(.small)
+
+            Text(localized("Nearby Networks"))
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.leading, 4)
+
+            content
+                .frame(maxHeight: .infinity, alignment: .top)
+
+            Divider()
+
+            Button(action: onOpenSettings) {
+                Text(localized("Network Settings…"))
+                    .font(.system(size: 11.5, weight: .medium))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 4)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
-        .padding(12)
-        .frame(width: 300)
         .task {
             await statusStore.scanNearbyWiFiIfNeeded()
         }
@@ -143,7 +162,6 @@ private struct NearbyWiFiPopoverView: View {
                     }
                 }
             }
-            .frame(maxHeight: 252)
 
             if case let .failure(error) = controller.state {
                 Text(error)
@@ -166,6 +184,7 @@ private struct NearbyWiFiPopoverView: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: network.signalSymbolName, variableValue: network.signalSymbolVariableValue)
+                    .foregroundStyle(network.isCurrent ? Color.accentColor : Color.primary)
                     .frame(width: 18)
                     .accessibilityHidden(true)
 
@@ -195,9 +214,13 @@ private struct NearbyWiFiPopoverView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 6)
+        .padding(.horizontal, 8)
         .frame(height: 30)
-        .disabled(network.isCurrent || controller.isBusy)
+        .background(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(.primary.opacity(network.isCurrent ? 0.09 : 0))
+        )
+        .disabled(controller.isBusy)
         .accessibilityLabel(network.ssid)
         .accessibilityValue(accessibilityValue(for: network))
         .accessibilityHint(network.isCurrent ? localized("Current Network") : localized("Join network"))
