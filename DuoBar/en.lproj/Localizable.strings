@@ -141,3 +141,9 @@
 "Hotspot" = "Hotspot";
 "Personal Hotspot connected" = "Personal Hotspot connected";
 "Back" = "Back";
+"CPU" = "CPU";
+"Load" = "Load";
+"Memory" = "Memory";
+"%@ used" = "%@ used";
+"Storage" = "Storage";
+"Available" = "Available";

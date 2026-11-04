@@ -106,3 +106,9 @@
 "Hotspot" = "ฮอตสปอต";
 "Personal Hotspot connected" = "เชื่อมต่อฮอตสปอตส่วนบุคคลแล้ว";
 "Back" = "ย้อนกลับ";
+"CPU" = "CPU";
+"Load" = "โหลด";
+"Memory" = "หน่วยความจำ";
+"%@ used" = "ใช้ไป %@";
+"Storage" = "พื้นที่จัดเก็บ";
+"Available" = "ว่าง";

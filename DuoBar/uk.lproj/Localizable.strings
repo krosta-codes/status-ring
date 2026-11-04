@@ -141,3 +141,9 @@
 "Hotspot" = "Модем";
 "Personal Hotspot connected" = "Режим модема підключено";
 "Back" = "Назад";
+"CPU" = "ЦП";
+"Load" = "Навантаження";
+"Memory" = "Пам’ять";
+"%@ used" = "Зайнято %@";
+"Storage" = "Сховище";
+"Available" = "Доступно";

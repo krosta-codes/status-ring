@@ -89,6 +89,8 @@ struct StatusPopoverView: View {
             .frame(maxWidth: .infinity)
             .accessibilityHint(localized("Open Battery Settings"))
 
+            SystemStatsTiles(stats: statusStore.systemStats)
+
             StatusRow(
                 symbol: audioOutputSymbol,
                 title: localized("Audio Output"),

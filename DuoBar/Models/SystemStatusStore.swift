@@ -8,6 +8,7 @@ final class SystemStatusStore: ObservableObject {
     @Published private(set) var wifiPowerControlError: String?
     @Published private(set) var wifiSSIDAuthorization: SSIDAuthorizationState = .notDetermined
     @Published private(set) var networkSpeed: NetworkSpeed?
+    @Published private(set) var systemStats: SystemStats?
     @Published private(set) var batteryTimeEstimate: BatteryTimeEstimate = .unavailable
 
     let priorityController = StatusPriorityController()
@@ -21,6 +22,7 @@ final class SystemStatusStore: ObservableObject {
     private let volumeKeyInterceptor = VolumeKeyInterceptor()
     private let bluetoothService: BluetoothService
     private let networkSpeedService = NetworkSpeedService()
+    private let systemStatsService = SystemStatsService()
     private var batteryTimeTimer: Timer?
 
     #if DEBUG
@@ -84,6 +86,9 @@ final class SystemStatusStore: ObservableObject {
             self?.mutate { $0.network = value }
             self?.networkSpeedService.setInterface(value.isConnected ? value.interfaceName : nil)
         }
+        systemStatsService.onStatsChange = { [weak self] stats in
+            self?.systemStats = stats
+        }
         networkSpeedService.onSpeedChange = { [weak self] speed in
             self?.networkSpeed = speed
         }
@@ -129,6 +134,7 @@ final class SystemStatusStore: ObservableObject {
     func setPopoverActive(_ active: Bool) {
         if active {
             networkSpeedService.start()
+            systemStatsService.start()
             startBatteryTimeUpdates()
             volumeKeyInterceptor.onKey = { [weak self] key, isFineStep in
                 self?.handleVolumeKey(key, isFineStep: isFineStep) ?? false
@@ -136,6 +142,7 @@ final class SystemStatusStore: ObservableObject {
             volumeKeyInterceptor.start()
         } else {
             networkSpeedService.stop()
+            systemStatsService.stop()
             stopBatteryTimeUpdates()
             volumeKeyInterceptor.stop()
         }

@@ -141,3 +141,9 @@
 "Hotspot" = "熱點";
 "Personal Hotspot connected" = "個人熱點已連線";
 "Back" = "返回";
+"CPU" = "CPU";
+"Load" = "負載";
+"Memory" = "記憶體";
+"%@ used" = "已使用 %@";
+"Storage" = "儲存空間";
+"Available" = "可用";
