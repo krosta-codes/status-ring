@@ -18,6 +18,7 @@ final class SystemStatusStore: ObservableObject {
     private let batteryService: BatteryService
     private let networkService: NetworkService
     private let audioOutputService: AudioOutputService
+    private let volumeKeyInterceptor = VolumeKeyInterceptor()
     private let bluetoothService: BluetoothService
     private let networkSpeedService = NetworkSpeedService()
     private var batteryTimeTimer: Timer?
@@ -129,9 +130,35 @@ final class SystemStatusStore: ObservableObject {
         if active {
             networkSpeedService.start()
             startBatteryTimeUpdates()
+            volumeKeyInterceptor.onKey = { [weak self] key, isFineStep in
+                self?.handleVolumeKey(key, isFineStep: isFineStep) ?? false
+            }
+            volumeKeyInterceptor.start()
         } else {
             networkSpeedService.stop()
             stopBatteryTimeUpdates()
+            volumeKeyInterceptor.stop()
+        }
+    }
+
+    /// Applies a hardware volume key while the popover is open, using the
+    /// system's 16 steps (64 with Option+Shift). Returns false when the output
+    /// cannot be controlled, so the key falls through to macOS.
+    private func handleVolumeKey(_ key: VolumeKey, isFineStep: Bool) -> Bool {
+        let volume = status.audio.volume
+        switch key {
+        case .mute:
+            guard volume.isMuteSettable else { return false }
+            return setMuted(!volume.isMuted)
+        case .up, .down:
+            guard volume.isSettable, let level = volume.level else { return false }
+            let step = isFineStep ? 1.0 / 64 : 1.0 / 16
+            let raw = level + (key == .up ? step : -step)
+            let target = min(max((raw / step).rounded() * step, 0), 1)
+            if key == .up, volume.isMuted, volume.isMuteSettable {
+                _ = setMuted(false)
+            }
+            return setVolume(target)
         }
     }
 
