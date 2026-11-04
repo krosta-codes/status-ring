@@ -1,77 +1,109 @@
 import SwiftUI
 
-struct AudioOutputRow: View {
-    let symbol: String
+/// Device picker that fills the whole popover panel, in the same style as the
+/// Wi-Fi panel (Control Center detail view).
+struct AudioDevicePanelView: View {
     let title: String
-    let detail: String
-    let stateText: String
-    let outputs: [AudioDeviceStatus]
+    let devices: [AudioDeviceStatus]
     let selectedUID: String?
+    let emptyText: String
+    let failureText: String
+    let symbol: (AudioDeviceStatus) -> String
     let onSelect: (String) -> Bool
-    let onOpenSoundSettings: () -> Void
-    let onOpenBluetoothSettings: () -> Void
-    var emptyText = localized("No output devices")
-    var failureText = localized("Unable to Switch Output")
-    var hint = localized("Select audio output")
-    var showsBluetoothSettings = true
+    let onBack: () -> Void
+    let onOpenSettings: () -> Void
+
     @State private var switchFailed = false
 
     var body: some View {
-        Menu {
-            if outputs.isEmpty {
-                Text(emptyText)
-            } else {
-                Picker(selection: selection) {
-                    ForEach(outputs) { device in
-                        Text(device.name).tag(device.uid)
-                    }
-                } label: {
-                    Text(title)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Button(action: onBack) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 12, weight: .semibold))
+                        .frame(width: 22, height: 22)
+                        .contentShape(Rectangle())
                 }
-                .pickerStyle(.inline)
+                .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
+                .accessibilityLabel(localized("Back"))
+
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+
+                Spacer()
+            }
+
+            if devices.isEmpty {
+                Text(emptyText)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 76)
+                Spacer(minLength: 0)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 2) {
+                        ForEach(devices) { device in
+                            deviceButton(device)
+                        }
+                    }
+                }
+                .frame(maxHeight: .infinity, alignment: .top)
+            }
+
+            if switchFailed {
+                Text(failureText)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
             }
 
             Divider()
 
-                Button(localized("Sound Settings…")) {
-                    onOpenSoundSettings()
-                }
-                if showsBluetoothSettings {
-                    Button(localized("Bluetooth Settings…")) {
-                        onOpenBluetoothSettings()
-                    }
-                }
-                if switchFailed {
-                    Text(failureText)
-                        .foregroundStyle(.secondary)
-                }
-        } label: {
-            StatusRow(
-                symbol: symbol,
-                title: title,
-                detail: detail,
-                stateText: stateText,
-                tint: .primary,
-                accessory: .menu
-            )
+            Button(action: onOpenSettings) {
+                Text(localized("Sound Settings…"))
+                    .font(.system(size: 11.5, weight: .medium))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 4)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .frame(maxWidth: .infinity)
-        .frame(height: 36)
-        .popoverCardBackground(cornerRadius: 18, fillOpacity: 0.045)
-        .accessibilityLabel(title)
-        .accessibilityValue(detail)
-        .accessibilityHint(hint)
     }
 
-    private var selection: Binding<String> {
-        Binding(
-            get: { selectedUID ?? "" },
-            set: { uid in
-                guard !uid.isEmpty, uid != selectedUID else { return }
-                switchFailed = !onSelect(uid)
+    private func deviceButton(_ device: AudioDeviceStatus) -> some View {
+        let isSelected = device.uid == selectedUID
+        return Button {
+            guard !isSelected else { return }
+            switchFailed = !onSelect(device.uid)
+        } label: {
+            HStack(spacing: 10) {
+                ControlIconBadge(isActive: isSelected, size: 26) {
+                    Image(systemName: symbol(device))
+                }
+                .font(.system(size: 11, weight: .semibold))
+
+                Text(device.name)
+                    .font(.system(size: 12))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Spacer(minLength: 8)
+
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .semibold))
+                }
             }
+            .padding(.horizontal, 6)
+            .frame(height: 34)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(.primary.opacity(isSelected ? 0.09 : 0))
         )
+        .accessibilityLabel(device.name)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }

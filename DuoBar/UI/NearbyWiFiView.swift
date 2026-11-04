@@ -1,28 +1,5 @@
 import SwiftUI
 
-struct NearbyWiFiButton: View {
-    let onOpen: () -> Void
-
-    var body: some View {
-        Button(action: onOpen) {
-            HStack(spacing: 8) {
-                Label(localized("Nearby Networks"), systemImage: "wifi")
-                    .font(.system(size: 10.5, weight: .medium))
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 8.5, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 10)
-        .frame(height: 28)
-        .popoverCardBackground(cornerRadius: 8, fillOpacity: 0.03)
-        .accessibilityHint(localized("Browse nearby Wi-Fi networks"))
-    }
-}
-
 /// Fills the whole popover panel, like the Wi-Fi detail view in Control Center.
 struct NearbyWiFiPanelView: View {
     let statusStore: SystemStatusStore

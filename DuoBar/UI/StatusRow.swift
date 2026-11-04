@@ -13,6 +13,7 @@ struct StatusRow: View {
     let speedText: String?
     let stateText: String
     let tint: Color
+    var isIconActive = false
     var accessory: Accessory = .none
     let trailing: AnyView?
     var onActivate: (() -> Void)?
@@ -25,6 +26,7 @@ struct StatusRow: View {
         speedText: String? = nil,
         stateText: String,
         tint: Color,
+        isIconActive: Bool = false,
         accessory: Accessory = .none,
         trailing: AnyView? = nil,
         onActivate: (() -> Void)? = nil,
@@ -36,6 +38,7 @@ struct StatusRow: View {
         self.speedText = speedText
         self.stateText = stateText
         self.tint = tint
+        self.isIconActive = isIconActive
         self.accessory = accessory
         self.trailing = trailing
         self.onActivate = onActivate
@@ -49,8 +52,8 @@ struct StatusRow: View {
                 trailing
             }
         }
-        .padding(.horizontal, 10)
-        .frame(height: 48)
+        .padding(.horizontal, 8)
+        .frame(height: 50)
         .popoverCardBackground(cornerRadius: 11, fillOpacity: 0.045)
     }
 
@@ -79,23 +82,21 @@ struct StatusRow: View {
 
     private var labelContent: some View {
         HStack(spacing: 11) {
-            Image(systemName: symbol)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(tint)
-                .frame(width: 28, height: 28)
-                .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            ControlIconBadge(isActive: isIconActive) {
+                Image(systemName: symbol)
+            }
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(.system(size: 12.5, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.82)
+                    .fixedSize()
                 HStack(spacing: 6) {
                     Text(detail)
                         .font(.system(size: 10.5))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
-                        .truncationMode(.middle)
+                        .truncationMode(.tail)
                         .minimumScaleFactor(0.72)
                     if let speedText {
                         Spacer(minLength: 0)

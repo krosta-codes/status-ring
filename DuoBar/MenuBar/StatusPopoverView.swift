@@ -6,7 +6,8 @@ struct StatusPopoverView: View {
     @ObservedObject private var presentation = PopoverPresentationState.shared
     @AppStorage(PreferenceKeys.showBatteryPercentage) private var showBatteryPercentage = true
     @AppStorage(PreferenceKeys.batteryColorCoding) private var batteryColorCoding = false
-    @State private var showsNearbyNetworks = false
+    @State private var detail: PopoverDetail?
+    @State private var mainContentSize: CGSize = .zero
     private let onClose: () -> Void
 
     init(statusStore: SystemStatusStore, onClose: @escaping () -> Void) {
@@ -19,27 +20,32 @@ struct StatusPopoverView: View {
             // The main content stays laid out underneath so the panel keeps its
             // size; Nearby Networks takes over the whole panel like the Wi-Fi
             // detail view in Control Center.
+            // Glass tiles ignore a parent's opacity, so the main content is
+            // removed while a detail panel is open; the measured size keeps the
+            // panel from resizing, like the Control Center detail views.
             ZStack {
-                panelContent
-                    .opacity(showsNearbyNetworks ? 0 : 1)
-                    .allowsHitTesting(!showsNearbyNetworks)
-                    .accessibilityHidden(showsNearbyNetworks)
-
-                if showsNearbyNetworks {
-                    NearbyWiFiPanelView(
-                        statusStore: statusStore,
-                        wifiPowerToggle: wifiPowerToggle,
-                        onBack: { setNearbyNetworksShown(false) },
-                        onOpenSettings: openWiFiSettings
-                    )
-                    .padding(12)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                if let detail {
+                    detailPanel(detail)
+                        .padding(14)
+                        .modifier(ControlModuleBackground())
+                        .padding(14)
+                        .frame(width: mainContentSize.width, height: mainContentSize.height)
+                        .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                } else {
+                    panelContent
+                        .background(
+                            GeometryReader { proxy in
+                                Color.clear
+                                    .onAppear { mainContentSize = proxy.size }
+                                    .onChange(of: proxy.size) { mainContentSize = $0 }
+                            }
+                        )
+                        .transition(.opacity)
                 }
             }
         }
         .onChange(of: presentation.isShown) { isShown in
-            if !isShown { showsNearbyNetworks = false }
+            if !isShown { detail = nil }
         }
         .opacity(presentation.isShown ? 1 : 0)
         .animation(presentation.isShown ? PopoverMotion.openOpacity : PopoverMotion.close, value: presentation.isShown)
@@ -56,15 +62,12 @@ struct StatusPopoverView: View {
                 speedText: networkSpeedText,
                 stateText: networkState,
                 tint: .primary,
+                isIconActive: statusStore.status.network.isConnected,
                 accessory: .disclosure,
                 trailing: wifiPowerToggle,
-                onActivate: openNetworkSettings,
-                activationHint: networkSettingsHint
+                onActivate: { showDetail(.network) },
+                activationHint: localized("Browse nearby Wi-Fi networks")
             )
-
-            NearbyWiFiButton {
-                setNearbyNetworksShown(true)
-            }
 
             VolumeStatusRow(
                 volume: statusStore.status.audio.volume,
@@ -86,32 +89,26 @@ struct StatusPopoverView: View {
             .frame(maxWidth: .infinity)
             .accessibilityHint(localized("Open Battery Settings"))
 
-            AudioOutputRow(
+            StatusRow(
                 symbol: audioOutputSymbol,
                 title: localized("Audio Output"),
                 detail: audioOutputDetail,
                 stateText: audioOutputState,
-                outputs: statusStore.status.audio.selectableOutputs,
-                selectedUID: statusStore.status.audio.defaultOutput?.uid,
-                onSelect: { statusStore.setDefaultOutput(uid: $0) },
-                onOpenSoundSettings: openSoundSettings,
-                onOpenBluetoothSettings: { SystemSettingsOpener.open(.bluetooth) }
+                tint: .primary,
+                accessory: .disclosure,
+                onActivate: { showDetail(.output) },
+                activationHint: localized("Select audio output")
             )
 
-            AudioOutputRow(
+            StatusRow(
                 symbol: audioInputSymbol,
                 title: localized("Audio Input"),
                 detail: audioInputDetail,
                 stateText: audioInputState,
-                outputs: statusStore.status.audio.selectableInputs,
-                selectedUID: statusStore.status.audio.defaultInput?.uid,
-                onSelect: { statusStore.setDefaultInput(uid: $0) },
-                onOpenSoundSettings: openSoundSettings,
-                onOpenBluetoothSettings: {},
-                emptyText: localized("No input devices"),
-                failureText: localized("Unable to Switch Input"),
-                hint: localized("Select audio input"),
-                showsBluetoothSettings: false
+                tint: .primary,
+                accessory: .disclosure,
+                onActivate: { showDetail(.input) },
+                activationHint: localized("Select audio input")
             )
 
             #if DEBUG
@@ -136,8 +133,8 @@ struct StatusPopoverView: View {
             .frame(height: 34)
             .popoverCardBackground(cornerRadius: 17, fillOpacity: 0.045)
         }
-        .padding(12)
-        .frame(width: 304)
+        .padding(14)
+        .frame(width: 312)
         .onAppear {
             NSApp.activate(ignoringOtherApps: true)
         }
@@ -198,9 +195,61 @@ struct StatusPopoverView: View {
         onClose()
     }
 
-    private func setNearbyNetworksShown(_ shown: Bool) {
+    private enum PopoverDetail {
+        case network
+        case output
+        case input
+    }
+
+    private func showDetail(_ newDetail: PopoverDetail?) {
         withAnimation(.easeInOut(duration: 0.22)) {
-            showsNearbyNetworks = shown
+            detail = newDetail
+        }
+    }
+
+    @ViewBuilder
+    private func detailPanel(_ detail: PopoverDetail) -> some View {
+        switch detail {
+        case .network:
+            NearbyWiFiPanelView(
+                statusStore: statusStore,
+                wifiPowerToggle: wifiPowerToggle,
+                onBack: { showDetail(nil) },
+                onOpenSettings: openNetworkSettings
+            )
+        case .output:
+            AudioDevicePanelView(
+                title: localized("Audio Output"),
+                devices: statusStore.status.audio.selectableOutputs,
+                selectedUID: statusStore.status.audio.defaultOutput?.uid,
+                emptyText: localized("No output devices"),
+                failureText: localized("Unable to Switch Output"),
+                symbol: audioDeviceSymbol,
+                onSelect: { statusStore.setDefaultOutput(uid: $0) },
+                onBack: { showDetail(nil) },
+                onOpenSettings: openSoundSettings
+            )
+        case .input:
+            AudioDevicePanelView(
+                title: localized("Audio Input"),
+                devices: statusStore.status.audio.selectableInputs,
+                selectedUID: statusStore.status.audio.defaultInput?.uid,
+                emptyText: localized("No input devices"),
+                failureText: localized("Unable to Switch Input"),
+                symbol: { _ in "mic" },
+                onSelect: { statusStore.setDefaultInput(uid: $0) },
+                onBack: { showDetail(nil) },
+                onOpenSettings: openSoundSettings
+            )
+        }
+    }
+
+    private func audioDeviceSymbol(_ device: AudioDeviceStatus) -> String {
+        switch device.category {
+        case .airPods: return "airpodspro"
+        case .headphones, .bluetoothAudio: return "headphones"
+        case .displayAudio: return "display"
+        case .usbAudio, .builtInSpeaker, .other: return "speaker.wave.2"
         }
     }
 
@@ -350,16 +399,14 @@ struct BatteryStatusRow: View {
 
     var body: some View {
         HStack(spacing: 11) {
-            Image(systemName: symbol)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.primary)
-                .frame(width: 28, height: 28)
-                .background(.primary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            ControlIconBadge(isActive: false) {
+                Image(systemName: symbol)
+            }
 
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 8) {
                     Text(localized("Battery"))
-                        .font(.system(size: 12.5, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                     Spacer(minLength: 8)
                     if let trailingValue {
                         Text(trailingValue)

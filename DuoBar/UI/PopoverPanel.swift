@@ -1,7 +1,7 @@
 import AppKit
 
-/// Borderless, fully transparent panel that replaces NSPopover so each
-/// SwiftUI tile can float as its own glass shape.
+/// Borderless, transparent panel that replaces NSPopover so each SwiftUI
+/// module can float as its own glass shape.
 @MainActor
 final class PopoverPanel: NSPanel {
     var onResignKey: (@MainActor () -> Void)?
@@ -19,6 +19,8 @@ final class PopoverPanel: NSPanel {
         )
         isOpaque = false
         backgroundColor = .clear
+        // Modules draw their own drop shadows (ModuleDropShadow); a window
+        // shadow would outline the faint glass halo at the window bounds.
         hasShadow = false
         level = .popUpMenu
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]

@@ -11,14 +11,14 @@ struct VolumeStatusRow: View {
 
     var body: some View {
         HStack(spacing: 11) {
-            muteControl
-                .frame(width: 28, height: 28)
-                .background(.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            ControlIconBadge(isActive: false) {
+                muteControl
+            }
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(localized("Volume"))
-                        .font(.system(size: 12.5, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .lineLimit(1)
                         .minimumScaleFactor(0.82)
                     Spacer()
@@ -51,8 +51,8 @@ struct VolumeStatusRow: View {
                 }
             }
         }
-        .padding(.horizontal, 10)
-        .frame(height: 54)
+        .padding(.horizontal, 8)
+        .frame(height: 58)
         .popoverCardBackground(cornerRadius: 11, fillOpacity: 0.045)
     }
 
