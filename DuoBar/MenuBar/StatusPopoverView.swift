@@ -8,6 +8,9 @@ struct StatusPopoverView: View {
     @AppStorage(PreferenceKeys.batteryColorCoding) private var batteryColorCoding = false
     @State private var detail: PopoverDetail?
     @State private var mainContentSize: CGSize = .zero
+    /// Links a row to its detail module so the row itself expands to the top
+    /// and retracts back into its slot, like Control Center.
+    @Namespace private var detailNamespace
     @ObservedObject private var commandKey = CommandKeyMonitor.shared
     @StateObject private var moduleOrder = ReorderController(
         axis: .vertical,
@@ -43,10 +46,13 @@ struct StatusPopoverView: View {
                 if let detail {
                     detailPanel(detail)
                         .padding(14)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                         .modifier(ControlModuleBackground())
+                        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                        .matchedGeometryEffect(id: detail, in: detailNamespace)
                         .padding(14)
                         .frame(width: mainContentSize.width, height: mainContentSize.height)
-                        .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                        .transition(.opacity)
                 } else {
                     panelContent
                         .background(
@@ -128,6 +134,7 @@ struct StatusPopoverView: View {
                 onActivate: { showDetail(.network) },
                 activationHint: localized("Browse nearby Wi-Fi networks")
             )
+            .matchedGeometryEffect(id: PopoverDetail.network, in: detailNamespace)
         case .volume:
             VolumeStatusRow(
                 volume: statusStore.status.audio.volume,
@@ -176,6 +183,7 @@ struct StatusPopoverView: View {
                 onActivate: { showDetail(.output) },
                 activationHint: localized("Select audio output")
             )
+            .matchedGeometryEffect(id: PopoverDetail.output, in: detailNamespace)
         case .audioInput:
             StatusRow(
                 symbol: audioInputSymbol,
@@ -187,6 +195,7 @@ struct StatusPopoverView: View {
                 onActivate: { showDetail(.input) },
                 activationHint: localized("Select audio input")
             )
+            .matchedGeometryEffect(id: PopoverDetail.input, in: detailNamespace)
         }
     }
 
@@ -245,14 +254,14 @@ struct StatusPopoverView: View {
         onClose()
     }
 
-    private enum PopoverDetail {
+    private enum PopoverDetail: Hashable {
         case network
         case output
         case input
     }
 
     private func showDetail(_ newDetail: PopoverDetail?) {
-        withAnimation(.easeInOut(duration: 0.22)) {
+        withAnimation(.spring(duration: 0.38, bounce: 0.12)) {
             detail = newDetail
         }
     }
