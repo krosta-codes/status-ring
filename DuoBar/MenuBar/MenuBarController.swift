@@ -11,6 +11,7 @@ final class MenuBarController: NSObject {
     private var isClosing = false
     private var closeWorkItem: DispatchWorkItem?
     private var lastDismissUptime: TimeInterval = 0
+    private var highlightCapsule: NSView?
     private var isPanelVisible: Bool { panel?.isVisible == true && !isClosing }
     private let statusStore: SystemStatusStore
     private var hostingView: PassthroughHostingView<DuoStatusView>?
@@ -136,6 +137,7 @@ final class MenuBarController: NSObject {
         }
         installOutsideClickMonitors()
         statusStore.setPopoverActive(true)
+        setStatusItemHighlighted(true)
         // Let the accessory app finish activating and the popover become key
         // before asking CoreLocation to present its native authorization UI.
         DispatchQueue.main.async { [weak self] in
@@ -373,12 +375,49 @@ final class MenuBarController: NSObject {
 
 extension MenuBarController {
     /// Hides the panel and runs the cleanup the popover delegate used to do.
+    /// Keeps the menu bar capsule for as long as the popover is open, like
+    /// Control Center. The system only draws a status item's highlight while
+    /// the mouse is down (a custom panel is not a system menu session), so the
+    /// capsule is drawn here, behind the button, across the item's whole
+    /// window (the button itself is narrower than the system highlight).
+    private func setStatusItemHighlighted(_ highlighted: Bool) {
+        guard let button = statusItem.button, let host = button.window?.contentView else { return }
+        let capsule: NSView
+        if let existing = highlightCapsule, existing.superview === host {
+            capsule = existing
+        } else {
+            highlightCapsule?.removeFromSuperview()
+            capsule = NSView()
+            capsule.wantsLayer = true
+            capsule.alphaValue = 0
+            host.addSubview(capsule, positioned: .below, relativeTo: nil)
+            highlightCapsule = capsule
+        }
+        let height = min(host.bounds.height, 24)
+        capsule.frame = NSRect(
+            x: 0,
+            y: ((host.bounds.height - height) / 2).rounded(),
+            width: host.bounds.width,
+            height: height
+        )
+        capsule.layer?.cornerRadius = height / 2
+        let isDark = button.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        capsule.layer?.backgroundColor = (isDark
+            ? NSColor.white.withAlphaComponent(0.16)
+            : NSColor.black.withAlphaComponent(0.1)).cgColor
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = highlighted ? 0.12 : 0.2
+            capsule.animator().alphaValue = highlighted ? 1 : 0
+        }
+    }
+
     func dismissPanel() {
         guard isPanelVisible else { return }
         isClosing = true
         lastDismissUptime = ProcessInfo.processInfo.systemUptime
         removeOutsideClickMonitors()
         statusStore.setPopoverActive(false)
+        setStatusItemHighlighted(false)
         perform(hoverInteraction.popoverClosedExternally())
 
         // An expanded module retracts into its slot first, then the popover fades.
