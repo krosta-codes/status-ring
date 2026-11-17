@@ -62,9 +62,11 @@ final class LaptopRingModeController {
     init(
         hasInternalBattery: Bool,
         fullChargeDelay: LaptopAdaptiveFullChargeDelay = .default,
-        scheduler: LaptopRingModeScheduling? = nil
+        scheduler: LaptopRingModeScheduling? = nil,
+        allowsAdaptiveOnExternalPower: Bool = true
     ) {
         self.hasInternalBattery = hasInternalBattery
+        self.allowsAdaptiveOnExternalPower = allowsAdaptiveOnExternalPower
         self.fullChargeDelay = fullChargeDelay
         self.scheduler = scheduler ?? DispatchLaptopRingModeScheduler()
     }
