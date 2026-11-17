@@ -8,7 +8,8 @@ REF_APP="${REF_APP:-$HOME/Projects/apps/duobar/build/reference/DuoBar.app}"
 APP=build/DuoBar.app
 rm -rf "$APP" && mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 find DuoBar -name '*.swift' > build/sources.txt
-swiftc -O -swift-version 5 -parse-as-library -target "$(uname -m)-apple-macos13.0" \
+SDK="${SDK:-/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk}"  # 27.x SDK needs SwiftUIMacros (Xcode only)
+swiftc -O -sdk "$SDK" -swift-version 5 -parse-as-library -target "$(uname -m)-apple-macos13.0" \
   -module-name DuoBar @build/sources.txt -o "$APP/Contents/MacOS/DuoBar"
 cp "$REF_APP/Contents/Info.plist" "$REF_APP/Contents/PkgInfo" "$APP/Contents/"
 cp "$REF_APP/Contents/Resources/Assets.car" "$REF_APP/Contents/Resources/AppIcon.icns" "$APP/Contents/Resources/"
