@@ -21,9 +21,17 @@ final class BatteryRingPresentationTests: XCTestCase {
         XCTAssertEqual(presentation(percentage: 15, charging: true, lowPowerMode: true).colorRole, .charging)
     }
 
-    func testAuthoritativeFullSuppressesChargingColor() {
+    func testFullOnAdapterIsClosedGreenRing() {
         XCTAssertEqual(
-            presentation(percentage: 100, charging: true, pluggedIn: true, fullyCharged: true).colorRole,
+            presentation(percentage: 100, charging: true, pluggedIn: true, fullyCharged: true),
+            BatteryRingPresentation(boltPlacement: .none, colorRole: .charging)
+        )
+        XCTAssertEqual(
+            presentation(percentage: 100, pluggedIn: true, fullyCharged: false),
+            BatteryRingPresentation(boltPlacement: .none, colorRole: .charging)
+        )
+        XCTAssertEqual(
+            presentation(percentage: 100, fullyCharged: true).colorRole,
             .monochrome
         )
     }
