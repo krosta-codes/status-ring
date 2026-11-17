@@ -200,6 +200,17 @@ final class LaptopRingModeController {
     private func activateAdaptive() {
         cancelFullChargeDelay()
         awaitingAuthoritativeFullCharge = false
+        // Local preference: a MacBook on the adapter keeps the battery ring
+        // (full and green) instead of swapping to the Adaptive activity ring.
+        guard allowsAdaptiveOnExternalPower else {
+            setState(LaptopRingModeState(
+                mode: .battery,
+                sessionStartPercentage: state.sessionStartPercentage,
+                targetPercentage: state.targetPercentage,
+                isWaitingForFullChargeDelay: false
+            ))
+            return
+        }
         setState(LaptopRingModeState(
             mode: .adaptive,
             sessionStartPercentage: state.sessionStartPercentage,
