@@ -54,6 +54,7 @@ final class LaptopRingModeController {
     private var fullChargeDelayGeneration = 0
     private var latestBattery: BatteryStatus?
     private var awaitingAuthoritativeFullCharge = false
+    private let allowsAdaptiveOnExternalPower: Bool
 
     private(set) var state: LaptopRingModeState = .battery
     private(set) var fullChargeDelay: LaptopAdaptiveFullChargeDelay
