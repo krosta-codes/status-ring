@@ -46,7 +46,8 @@ final class SystemStatusStore: ObservableObject {
         self.deviceContext = resolvedDeviceContext
         let resolvedLaptopRingModeController = laptopRingModeController ?? LaptopRingModeController(
             hasInternalBattery: resolvedDeviceContext.hasInternalBattery,
-            fullChargeDelay: Self.developmentFullChargeDelay
+            fullChargeDelay: Self.developmentFullChargeDelay,
+            allowsAdaptiveOnExternalPower: false
         )
         self.laptopRingModeController = resolvedLaptopRingModeController
         nearbyWiFiController = NearbyWiFiController(
