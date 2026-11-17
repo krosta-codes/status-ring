@@ -20,3 +20,12 @@ for d in DuoBar/*.lproj; do cp -R "$d" "$APP/Contents/Resources/"; done
 IDENTITY=$(security find-identity -p codesigning | awk '/"DuoBar Local Signing"/ {print $2; exit}')
 codesign --force --sign "${IDENTITY:--}" --entitlements DuoBar/DuoBar.entitlements "$APP"
 echo "Built $APP"
+
+# Install: the LaunchAgent ~/Library/LaunchAgents/com.jurek.duobar.plist starts
+# /Applications/DuoBar.app at login, so every build replaces that copy and restarts it.
+pkill -x DuoBar || true
+rm -rf /Applications/DuoBar.app
+ditto "$APP" /Applications/DuoBar.app
+launchctl kickstart -k "gui/$(id -u)/com.jurek.duobar" 2>/dev/null \
+  || launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.jurek.duobar.plist"
+echo "Installed /Applications/DuoBar.app"

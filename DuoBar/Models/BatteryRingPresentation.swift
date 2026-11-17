@@ -27,15 +27,20 @@ struct BatteryRingPresentation: Equatable, Sendable {
             return BatteryRingPresentation(boltPlacement: .none, colorRole: .monochrome)
         }
 
-        // IOPowerSources' authoritative full flag wins over a concurrent or
-        // stale charging flag. Fully charged must not retain charging bolt or
-        // green charging semantics.
-        if battery.isFullyCharged {
-            return BatteryRingPresentation(boltPlacement: .none, colorRole: .monochrome)
+        // Full on the adapter (authoritative flag, or 100% while plugged in):
+        // a closed, full ring with no bolt gap. With color coding it stays
+        // green while the adapter is connected; unplugged it is monochrome.
+        let isFull = battery.isFullyCharged
+            || (battery.isPluggedIn && (battery.percentage ?? 0) >= 100)
+        if isFull {
+            return BatteryRingPresentation(
+                boltPlacement: .none,
+                colorRole: colorCodingEnabled && battery.isPluggedIn ? .charging : .monochrome
+            )
         }
 
         let boltPlacement: BatteryBoltPlacement = battery.isPluggedIn ? .topGap : .none
-        let boltDimmed = boltPlacement == .topGap && (battery.percentage ?? 0) >= 100
+        let boltDimmed = false
 
         guard colorCodingEnabled else {
             return BatteryRingPresentation(
