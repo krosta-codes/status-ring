@@ -50,7 +50,7 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    Text(localized("Choose a preset or fine-tune DuoBar to better match your menu bar."))
+                    Text(localized("Choose a preset or fine-tune Status Ring to better match your menu bar."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -60,7 +60,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Toggle(localized("Open on Hover"), isOn: $openOnHover)
                         .toggleStyle(.switch)
-                    Text(localized("Open DuoBar when the pointer moves over the menu bar icon."))
+                    Text(localized("Open Status Ring when the pointer moves over the menu bar icon."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -68,13 +68,13 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Toggle(localized("Show in Dock"), isOn: $showInDock)
                         .toggleStyle(.switch)
-                    Text(localized("Show the DuoBar icon in the Dock. Clicking it opens Settings."))
+                    Text(localized("Show the Status Ring icon in the Dock. Clicking it opens Settings."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
                 Toggle(
-                    localized("Launch DuoBar at login"),
+                    localized("Launch Status Ring at login"),
                     isOn: Binding(
                         get: { launchAtLogin.isEnabled },
                         set: launchAtLogin.setEnabled
@@ -125,7 +125,7 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .scenePadding()
         .frame(width: 420, height: settingsHeight)
-        .navigationTitle(localized("DuoBar Settings"))
+        .navigationTitle(localized("Status Ring Settings"))
         .onAppear {
             NSApp.activate(ignoringOtherApps: true)
             launchAtLogin.refresh()

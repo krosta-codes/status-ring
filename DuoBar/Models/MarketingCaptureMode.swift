@@ -2,8 +2,8 @@
 import Foundation
 
 enum MarketingCaptureMode {
-    static let stateNotification = Notification.Name("com.mikeli.duobar.debug.marketing-state")
-    static let popoverNotification = Notification.Name("com.mikeli.duobar.debug.marketing-popover")
+    static let stateNotification = Notification.Name("com.jurek.statusring.debug.marketing-state")
+    static let popoverNotification = Notification.Name("com.jurek.statusring.debug.marketing-popover")
 
     static var isEnabled: Bool {
         ProcessInfo.processInfo.arguments.contains("--marketing-capture")

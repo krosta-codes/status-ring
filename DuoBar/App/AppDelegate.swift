@@ -150,8 +150,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hasPresentedDiskImageInstallHelp = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
             let alert = NSAlert()
-            alert.messageText = localized("DuoBar is running from the disk image.")
-            alert.informativeText = localized("Move DuoBar to Applications to keep it installed after ejecting the disk image.")
+            alert.messageText = localized("Status Ring is running from the disk image.")
+            alert.informativeText = localized("Move Status Ring to Applications to keep it installed after ejecting the disk image.")
             alert.addButton(withTitle: localized("Open Applications"))
             alert.addButton(withTitle: localized("Not Now"))
 

@@ -6,7 +6,7 @@ final class ApplicationInstanceLock {
     private let lockFileName: String
     private var fileDescriptor: Int32 = -1
 
-    init(lockFileName: String = "com.mikeli.duobar.instance.lock") {
+    init(lockFileName: String = "com.jurek.statusring.instance.lock") {
         self.lockFileName = lockFileName
     }
 

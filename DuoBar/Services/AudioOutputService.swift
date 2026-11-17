@@ -15,7 +15,7 @@ final class AudioOutputService {
 
     private static let systemObject = AudioObjectID(kAudioObjectSystemObject)
 
-    private let listenerQueue = DispatchQueue(label: "com.mikeli.duobar.audio-listeners", qos: .utility)
+    private let listenerQueue = DispatchQueue(label: "com.jurek.statusring.audio-listeners", qos: .utility)
     private var systemListeners: [ListenerRegistration] = []
     private var deviceListeners: [ListenerRegistration] = []
     private var currentDefaultDeviceID = AudioDeviceID(kAudioObjectUnknown)

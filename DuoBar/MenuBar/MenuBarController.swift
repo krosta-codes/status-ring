@@ -48,7 +48,7 @@ final class MenuBarController: NSObject {
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         button.image = nil
         button.title = ""
-        button.toolTip = localized("DuoBar system status")
+        button.toolTip = localized("Status Ring system status")
 
         let rootView = DuoStatusView(statusStore: statusStore) { [weak self] width in
             self?.setStatusItemLength(width)

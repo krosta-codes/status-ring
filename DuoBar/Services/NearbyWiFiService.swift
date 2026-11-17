@@ -3,7 +3,7 @@ import Foundation
 
 final class CoreWLANNearbyWiFiProvider: @unchecked Sendable, NearbyWiFiProviding {
     private let client: CWWiFiClient
-    private let queue = DispatchQueue(label: "com.mikeli.duobar.nearby-wifi", qos: .userInitiated)
+    private let queue = DispatchQueue(label: "com.jurek.statusring.nearby-wifi", qos: .userInitiated)
     private var scannedNetworksByID: [String: CWNetwork] = [:]
 
     init(client: CWWiFiClient = .shared()) {

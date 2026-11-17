@@ -14,7 +14,7 @@ final class NetworkService: NSObject, @preconcurrency CLLocationManagerDelegate 
     private let wifiPowerCoordinator: WiFiPowerControlCoordinator
     private let locationManager = CLLocationManager()
     private let pathMonitor = NWPathMonitor()
-    private let monitorQueue = DispatchQueue(label: "com.mikeli.duobar.network-monitor", qos: .utility)
+    private let monitorQueue = DispatchQueue(label: "com.jurek.statusring.network-monitor", qos: .utility)
     private var latestPath: NWPath?
     private var detailRefreshTimer: Timer?
     private var applicationActivationObserver: NSObjectProtocol?

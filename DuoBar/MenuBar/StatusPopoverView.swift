@@ -101,7 +101,7 @@ struct StatusPopoverView: View {
 
                 Spacer()
 
-                Button(localized("Quit DuoBar")) {
+                Button(localized("Quit Status Ring")) {
                     NSApp.terminate(nil)
                 }
                 .buttonStyle(.plain)

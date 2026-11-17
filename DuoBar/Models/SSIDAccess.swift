@@ -174,7 +174,7 @@ struct SSIDHardwareDiagnostic: Equatable, Sendable {
 }
 
 extension Notification.Name {
-    static let debugSSIDManualRefresh = Notification.Name("com.mikeli.duobar.debug-ssid-manual-refresh")
+    static let debugSSIDManualRefresh = Notification.Name("com.jurek.statusring.debug-ssid-manual-refresh")
 }
 
 @MainActor
