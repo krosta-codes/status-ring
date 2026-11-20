@@ -8,7 +8,7 @@
 
 ## Why this exists
 
-My menu bar had a battery icon, a Wi-Fi icon, a volume icon and a system monitor, and the notch ate half of them. [DuoBar](https://github.com/Mikeli7666/DuoBar) by Mike Li had the right idea: pack the essentials into one glyph. Status Ring is my fork of it, tuned to how I read it at a glance, with CPU and memory folded in so I could delete my separate system monitor app.
+My menu bar had a battery icon, a Wi-Fi icon, a volume icon and a system monitor, all fighting the notch for space. [DuoBar](https://github.com/Mikeli7666/DuoBar) by Mike Li had the right idea: pack the essentials into one glyph. Status Ring is my fork of it, tuned to how I read it at a glance, with CPU and memory folded in so I could delete my separate system monitor app.
 
 ## What it does
 
