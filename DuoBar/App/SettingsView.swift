@@ -12,6 +12,8 @@ struct SettingsView: View {
     @AppStorage(PreferenceKeys.showInDock) private var showInDock = false
     @AppStorage(PreferenceKeys.showBatteryPercentageInMenuBar) private var showBatteryPercentageInMenuBar = false
     @StateObject private var launchAtLogin = LaunchAtLoginService()
+    @ObservedObject private var updates = UpdateService.shared
+    @AppStorage("updateCheck") private var updateCheck = true
     @ObservedObject private var adaptiveRingMonitor = AdaptiveRingMonitor.shared
     private let deviceContextService = DeviceContextService()
     #if DEBUG
@@ -80,6 +82,20 @@ struct SettingsView: View {
                         set: launchAtLogin.setEnabled
                     )
                 )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Toggle("Check for updates daily", isOn: $updateCheck)
+                        .toggleStyle(.switch)
+                    HStack {
+                        Button("Check now") { updates.check(manual: true) }
+                        if updates.available != nil {
+                            Button("Update") { updates.installUpdate() }
+                        }
+                        Text(updates.statusText.isEmpty ? "Version \(updates.currentVersion)" : updates.statusText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
 
                 if launchAtLogin.requiresApproval {
                     Text(localized("Approval is required in System Settings → General → Login Items."))

@@ -43,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         self.instanceLock = instanceLock
+        UpdateService.shared.start()
 
         applyDockPolicy()
         dockPreferenceObserver = NotificationCenter.default.addObserver(

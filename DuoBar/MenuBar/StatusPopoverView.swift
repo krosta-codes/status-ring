@@ -4,6 +4,7 @@ import SwiftUI
 struct StatusPopoverView: View {
     @ObservedObject private var statusStore: SystemStatusStore
     @ObservedObject private var presentation = PopoverPresentationState.shared
+    @ObservedObject private var updates = UpdateService.shared
     @AppStorage(PreferenceKeys.showBatteryPercentage) private var showBatteryPercentage = true
     @AppStorage(PreferenceKeys.batteryColorCoding) private var batteryColorCoding = false
     @State private var detail: PopoverDetail?
@@ -100,6 +101,13 @@ struct StatusPopoverView: View {
                 settingsAction
 
                 Spacer()
+
+                if let release = updates.available {
+                    Button("Update to \(release.tag)") { updates.installUpdate() }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Color.accentColor)
+                    Spacer()
+                }
 
                 Button(localized("Quit Status Ring")) {
                     NSApp.terminate(nil)
