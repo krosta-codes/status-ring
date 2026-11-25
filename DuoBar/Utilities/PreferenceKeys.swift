@@ -10,6 +10,8 @@ enum PreferenceKeys {
     static let openOnHover = "duoBar.openOnHover"
     static let showInDock = "duoBar.showInDock"
     static let showBatteryPercentageInMenuBar = "showBatteryPercentageInMenuBar"
+    static let appAudio = "appAudio"
+    static let appAudioDebug = "appAudioDebug"
 
     #if DEBUG
     static let simulateDesktopMac = "debug.simulateDesktopMac"
