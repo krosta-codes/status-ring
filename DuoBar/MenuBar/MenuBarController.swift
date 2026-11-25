@@ -14,6 +14,8 @@ final class MenuBarController: NSObject {
     private var highlightCapsule: NSView?
     private var isPanelVisible: Bool { panel?.isVisible == true && !isClosing }
     private let statusStore: SystemStatusStore
+    /// `AppAudioStore` (macOS 14.2+), type-erased so the target still compiles for macOS 13. T6 passes it to StatusPopoverView.
+    let appAudioStore: AnyObject?
     private var hostingView: PassthroughHostingView<DuoStatusView>?
     private var popoverTrackingView: HoverTrackingContainerView?
     private var lengthAnimationTimer: Timer?
@@ -27,8 +29,9 @@ final class MenuBarController: NSObject {
     )
     private var isInvalidated = false
 
-    init(statusStore: SystemStatusStore) {
+    init(statusStore: SystemStatusStore, appAudioStore: AnyObject? = nil) {
         self.statusStore = statusStore
+        self.appAudioStore = appAudioStore
         statusItem = NSStatusBar.system.statusItem(
             withLength: MenuBarIconSize.statusItemWidth(for: MenuBarIconSize.storedScale())
         )

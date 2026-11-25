@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let isRunningTests: Bool
     private var instanceLock: ApplicationInstanceLock?
     private var statusStore: SystemStatusStore?
+    private var appAudioStore: AnyObject?
     private var menuBarController: MenuBarController?
     private var wakeObserver: NSObjectProtocol?
     private var dockPreferenceObserver: NSObjectProtocol?
@@ -33,6 +34,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !isRunningTests else { return }
         guard menuBarController == nil else { return }
+
+        // Hidden launch flag: print the audio apps and exit, before the instance lock, so it works
+        // while the installed Status Ring keeps running.
+        if CommandLine.arguments.contains("--list-audio-apps") {
+            if #available(macOS 14.2, *) {
+                AppAudioService.runListAudioAppsAndExit()
+            }
+        }
 
         let instanceLock = ApplicationInstanceLock()
         guard instanceLock.acquire() else {
@@ -74,7 +83,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         #endif
 
-        let menuBarController = MenuBarController(statusStore: statusStore)
+        var appAudio: AnyObject?
+        if #available(macOS 14.2, *) {
+            let store = AppAudioStore()
+            store.start()
+            appAudio = store
+        }
+        appAudioStore = appAudio
+
+        let menuBarController = MenuBarController(statusStore: statusStore, appAudioStore: appAudio)
         self.menuBarController = menuBarController
 
         presentDiskImageInstallHelpIfNeeded()
@@ -163,6 +180,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        if #available(macOS 14.2, *) {
+            (appAudioStore as? AppAudioStore)?.stop()
+        }
         #if DEBUG
         if let marketingCaptureObserver {
             DistributedNotificationCenter.default().removeObserver(marketingCaptureObserver)

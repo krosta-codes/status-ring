@@ -50,6 +50,8 @@
 	<string>13.0</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>Status Ring reads an app's audio only to change its volume or send it to another output.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Status Ring uses Bluetooth availability with public audio metadata to recognize supported Bluetooth audio connections.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
