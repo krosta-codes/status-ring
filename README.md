@@ -2,6 +2,8 @@
 
 # Status Ring
 
+Class: public · Mac · AI: no · rung 2
+
 **Battery, network and volume in one tiny menu bar glyph, because your menu bar is not a parking lot.**
 
 [![License](https://img.shields.io/badge/license-MIT-black)](LICENSE) ![Platform](https://img.shields.io/badge/macOS-13%2B-black) [![Release](https://img.shields.io/github/v/release/krosta-codes/status-ring)](https://github.com/krosta-codes/status-ring/releases)
@@ -17,6 +19,7 @@ My menu bar had a battery icon, a Wi-Fi icon, a volume icon and a system monitor
 - **Four dots:** output volume.
 - **Desktop Macs** (no battery) get the Adaptive Ring, which shows system load instead.
 - **Click it** for a popover: battery details, network speed, nearby Wi-Fi, audio output and input switching, volume and brightness, CPU, memory and storage tiles. Cards can be reordered.
+- **App Volume:** per-app volume (0 to 100 %, no boost), mute and per-app output device, remembered per bundle ID. Open it from the chevron on the Volume card. Needs macOS 14.2 or later.
 - While the popover is open, the volume keys move its slider instead of popping the system overlay (needs Accessibility).
 
 ## Install
@@ -39,7 +42,7 @@ My menu bar had a battery icon, a Wi-Fi icon, a volume icon and a system monitor
 
 3. Optional, saves re-granting Location and Bluetooth after every update: create a local signing certificate once. Keychain Access › Certificate Assistant › Create a Certificate…, name `<Your name> Local Signing`, Identity Type "Self-Signed Root", Certificate Type "Code Signing". Run `install.sh` again.
 
-Permissions it may ask for: **Location** (macOS only reveals the Wi-Fi network name to apps with it), **Bluetooth** (recognises Bluetooth audio devices), **Accessibility** (volume keys, optional).
+Permissions it may ask for: **Location** (macOS only reveals the Wi-Fi network name to apps with it), **Bluetooth** (recognises Bluetooth audio devices), **Accessibility** (volume keys, optional), **System Audio Recording** (per-app volume, optional; asked on the first per-app change, lives in Privacy & Security › Screen & System Audio Recording).
 
 ## Updates
 
@@ -71,6 +74,7 @@ Needs Xcode in `/Applications` (the build itself does not). The script sets `DEV
 |---|---|
 | Battery, network, audio, system stats | read locally, never sent anywhere |
 | Wi-Fi name (Location permission) | used for display only |
+| App audio | processed live on this Mac, never recorded or sent |
 | Update check | one request to api.github.com, no data about you |
 
 ## Known quirks
@@ -78,6 +82,11 @@ Needs Xcode in `/Applications` (the build itself does not). The script sets `DEV
 - Without Location permission the Wi-Fi name shows as hidden. That's macOS, not us. Promise.
 - The source folders are still called `DuoBar`. Renaming 100 files buys nothing and makes merging upstream fixes harder.
 - Built without Xcode, so the asset catalog is precompiled in `assets/`. Change the icon there, not in `Assets.xcassets`.
+- App Volume needs macOS 14.2 or later. On older systems the section is simply not shown.
+- With TascamVolume running and the TASCAM US-4x4 as default output, TascamVolume applies the per-app levels (handoff). An app routed explicitly to the US-4x4 is also scaled by TascamVolume's master keys.
+- Builds without the local signing certificate (other users' updates) ask for the System Audio Recording permission again after each update.
+- Per-app settings live in the `appAudio` defaults key, a dictionary keyed by bundle ID: `{ volume = 0.3; muted = 0; outputUID = "<device UID>"; }`. `outputUID` is optional (absent means follow the default output); an entry at 100 %, unmuted, without `outputUID` is removed.
+- Diagnostics: `StatusRing --list-audio-apps` (hidden flag) lists the apps currently playing audio. For the debug log run `defaults write com.jurek.statusring appAudioDebug -bool true`, then `log stream --predicate 'subsystem == "com.jurek.statusring"'`.
 
 ## Credits
 
