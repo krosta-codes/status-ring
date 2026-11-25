@@ -130,7 +130,7 @@ struct AppAudioRow: Identifiable { id: String /*bundleID*/; name: String; icon: 
 - **New helper process:** when an app's process set grows, build the new engine first, then stop the old one. A helper plays untapped for that moment; documented.
 - **Idle apps:** no engine for an app with no running processes. The engine starts when the app's first process appears in the process list, stops when the last one leaves.
 - **Device changes:** listen to `kAudioDevicePropertyNominalSampleRate` and `kAudioDevicePropertyDeviceIsAlive` on each target device; rebuild that device's engines on change.
-- **Permission:** there is no public query for System Audio Recording. Detector: an engine whose app reports `IsRunningOutput = 1` but whose tap delivers exact zeros for 3 s → `permission = .suspectedDenied`, stop that engine (which unmutes the app). The panel then shows the permission line. Open Privacy & Security with `x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture`; the runner of CP3 verifies this URL lands on the right pane and records a fallback (`?Privacy_ScreenCapture`) if not.
+- **Permission:** there is no public query for System Audio Recording. Detector: an engine whose app reports `IsRunningOutput = 1` but whose tap delivers exact zeros for 3 s → `permission = .suspectedDenied`, stop that engine (which unmutes the app). The panel then shows the permission line. Open Privacy & Security with `x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture`; the CP3 lead verifies this URL lands on the right pane and records a fallback (`?Privacy_ScreenCapture`) if not.
 - **Debug log:** peaks are max-and-reset per 1 s window, written by the IOProc into the shared pointer, read and reset by a main-thread timer. Ratio prints `n/a` when input peak < 0.001. Use `%{public}@` in `os_log` so `log stream` shows values. **No `os_log` in the IOProc.**
 - **Reading across apps:** TascamVolume reads Status Ring's settings with `CFPreferencesAppSynchronize` + `CFPreferencesCopyAppValue("appAudio", "com.jurek.statusring")`, with the same lenient decoding.
 
@@ -139,7 +139,7 @@ struct AppAudioRow: Identifiable { id: String /*bundleID*/; name: String; icon: 
 - Every rebuild by the in-app updater signs with the local certificate; on Macs without one (other users), the System Audio Recording permission is asked again after each update. Say so in the README.
 - `NSAudioCaptureUsageDescription` must be in `assets/Info.plist`, or tap creation fails silently with a permission error. The first tap triggers the TCC prompt. Signing with "DuoBar Local Signing" keeps the grant across rebuilds; an ad-hoc build re-prompts every time.
 - The macOS 27 SDK needs Xcode's SwiftUI macros; keep using the 26.x SDK that `build-local.sh` picks. `CATapDescription` is in the 26.x SDK. Gate with `@available(macOS 14.2, *)`, the target stays `macos13.0`.
-- No XCTest in the Command Line Tools: the existing `DuoBarTests/` cannot run here. New tests use a small `swiftc` runner (CP1).
+- Tests run with Xcode 27.2 (`/Applications/Xcode.app`, XCTest and Swift Testing) through `./run-tests.sh [TestClass ...]`, which sets `DEVELOPER_DIR` itself (xcode-select still points at the Command Line Tools; leave it). Baseline 2026-11-25: 328 tests, 0 failures, 6 skipped. The project uses synchronized folders (objectVersion 77), so new files in `DuoBar/` and `DuoBarTests/` join their targets without editing `project.pbxproj`. `build-local.sh` (swiftc) stays the build and install path.
 - Never tap TascamVolume itself, and never let two Status Ring engines tap the same process.
 - Call apps (WhatsApp, FaceTime, Zoom) run on the mic clock: drift compensation is on for every Status Ring tap, so they are safe. On the TascamVolume side, a per-app tap for a call app needs drift compensation too (match `callBundlePrefixes`).
 - The IOProc runs on a real-time thread: no allocation, no locks, no Swift arrays grown inside it. Copy the `UnsafeMutablePointer<Float>` shared-state pattern from `GainEngine`.
@@ -150,16 +150,16 @@ Each task owns its files. No two tasks in one checkpoint share a file.
 
 ### CP1: model and tests
 
-- **T1 Models + test runner** (one subagent)
-  - Files (new): `DuoBar/Models/AppAudioSettings.swift`, `DuoBar/Models/AppAudioOwnership.swift`, `DuoBar/Models/AppAudioGrouping.swift`, `DuoBar/Utilities/CoreAudioQuery.swift` (copy of TascamVolume `CoreAudioHelpers.swift`, enum renamed `CAQuery`; moved here so T2 and T3 both find it), `tools/tests/AppAudioTests.swift`, `tools/run-tests.sh`. The keys `appAudio` and `appAudioDebug` live as static constants in `AppAudioSettings.swift`, not in `PreferenceKeys.swift` (that file references `MenuBarIconSize` and would not compile alone in the runner).
+- **T1 Models + XCTest cases** (one subagent)
+  - Files (new): `DuoBar/Models/AppAudioSettings.swift`, `DuoBar/Models/AppAudioOwnership.swift`, `DuoBar/Models/AppAudioGrouping.swift`, `DuoBar/Utilities/CoreAudioQuery.swift` (copy of TascamVolume `CoreAudioHelpers.swift`, enum renamed `CAQuery`; moved here so T2 and T3 both find it), `DuoBarTests/AppAudioTests.swift` (XCTest, `@testable import DuoBar`, like the existing test files). Edit: `DuoBar/Utilities/PreferenceKeys.swift` (add `appAudio`, `appAudioDebug`).
   - Decoding is lenient: `volume` accepts Double, Int, NSNumber or String (`defaults write -dict-add '{volume=0.3;}'` stores a string), `muted` accepts Bool, Int or String.
   - `AppAudioSettings`: struct `AppAudioSetting { volume: Double; muted: Bool; outputUID: String? }`, `isDefault`, plist dictionary encode and decode (`[String: Any]`), a `AppAudioSettingsStore` that reads and writes `UserDefaults` key `appAudio`, drops default entries on write, clamps volume to 0...1, and posts `com.jurek.statusring.appAudioChanged` via `DistributedNotificationCenter` after writing (injectable poster for tests).
   - `AppAudioOwnership`: pure function from the design section.
   - `AppAudioGrouping`: pure function `group(processes: [(pid, bundleID, isPlaying, objectID)], responsible: (pid) -> pid, ownPID:) -> [AppGroup]`, skipping own PID and `com.jurek.tascamvolume`.
-  - Only Foundation and CoreAudio types in these files (no AppKit), so the runner compiles them alone.
-  - `tools/run-tests.sh`: `swiftc -sdk <same SDK pick as build-local.sh> -parse-as-library DuoBar/Models/AppAudioSettings.swift DuoBar/Models/AppAudioOwnership.swift DuoBar/Models/AppAudioGrouping.swift tools/tests/AppAudioTests.swift` (explicit list, never a glob: `AppAudioStore.swift` uses AppKit and would break the runner) -o build/app-audio-tests && build/app-audio-tests`. The test file has a `@main` that runs named cases with a tiny `expect(_:_:)` helper, prints `PASS name` / `FAIL name: detail`, exits non-zero on any failure.
+  - Only Foundation and CoreAudio types in these files (no AppKit), so the logic stays testable without UI.
+  - Tests are plain XCTest cases in `DuoBarTests/AppAudioTests.swift`; settings tests use a scratch `UserDefaults(suiteName: "statusring.tests")` and remove it in `tearDown`.
   - Cases: default entry dropped on write; clamp; round trip through a scratch `UserDefaults(suiteName: "statusring.tests")`; ownership table (untouched, follow default to non-handoff device, follow default to handoff device = tascam, explicit route to handoff device = statusRing, missing route device = fallback to default, handoff inactive = statusRing); grouping (helpers merged under responsible PID, own PID skipped, TascamVolume skipped, not-playing app without settings dropped by the caller flag).
-  - Proof: `tools/run-tests.sh` exits 0; `./build-local.sh --no-install` still builds.
+  - Proof: `./run-tests.sh AppAudioTests` exit 0, then `./run-tests.sh` (all 328 + new) exit 0; `./build-local.sh --no-install` still builds.
 
 ### CP2: engine and discovery (waits for CP1: uses its types)
 
@@ -215,7 +215,7 @@ Each task owns its files. No two tasks in one checkpoint share a file.
 | CP | Delivers | Tasks | Check |
 |---|---|---|---|
 | 0 | Verification path works | lead | `security find-identity -p codesigning` lists "DuoBar Local Signing"; `./build-local.sh --no-install` green on the current tree; `log stream --predicate 'subsystem == "com.jurek.statusring"'` runs; US-4x4 connected (ask Jurek to plug it in if `system_profiler SPAudioDataType` does not list it; without it AC7 stays unverified and CP4 cannot close). |
-| 1 | Settings, ownership, grouping, tested | T1 | `tools/run-tests.sh` exit 0, plus each red-turn in Proof. |
+| 1 | Settings, ownership, grouping, tested | T1 | `./run-tests.sh` exit 0, plus each red-turn in Proof. |
 | 2 | Per-app gain, mute and route work from `defaults write` | T2, T3 parallel; then T4 | AC2, AC3, AC4, AC5, AC8 via the debug log. |
 | 3 | The App Volume panel in the popover | T5, T6 parallel | AC1, AC6, AC10, screenshot of the popover (light and dark), unslop scan. |
 | 4 | Handoff with TascamVolume | T7, T8 parallel | AC7, AC8 for TascamVolume, Tascam zone 2 still plays (Jurek listens), call app test (WhatsApp call, no crackle). |
@@ -237,24 +237,24 @@ CP3 and CP4 may overlap (different files and repos), at most 2 subagents at a ti
 
 ## Proof
 
-Verification path: this is a native menu bar app, so there is no browser check. Proof is (1) the `swiftc` test runner for the pure logic, (2) the debug log of the real engines with real audio, (3) screenshots of the popover via `screencapture -l<windowid>` or `screencapture -R`, (4) Jurek listening for the audible checks (zone 2, call quality), which the lead asks for explicitly and records.
+Verification path: this is a native menu bar app, so there is no browser check. Proof is (1) XCTest via `./run-tests.sh` for the pure logic (Xcode 27.2), (2) the debug log of the real engines with real audio, (3) screenshots of the popover via `screencapture -l<windowid>` or `screencapture -R`, (4) Jurek listening for the audible checks (zone 2, call quality), which the lead asks for explicitly and records.
 
 Test audio: `afplay -v 1 /System/Library/Sounds/Submarine.aiff` in a loop gives a process with a known bundle (`afplay` has none: use Music.app with any local track, and Safari with a YouTube tab, as the two real apps).
 
 | AC | Test | Red-turn (make it, see it fail, undo with the exact reverse edit) |
 |---|---|---|
-| AC1 | `StatusRing --list-audio-apps` with Music + Safari playing lists exactly `com.apple.Music` and `com.apple.Safari` (no WebContent row); panel screenshot. Runner case `grouping merges helpers`. | In `AppAudioGrouping`, use `pid` instead of `responsible(pid)`: the runner case fails. |
+| AC1 | `StatusRing --list-audio-apps` with Music + Safari playing lists exactly `com.apple.Music` and `com.apple.Safari` (no WebContent row); panel screenshot. Test `grouping merges helpers`. | In `AppAudioGrouping`, use `pid` instead of `responsible(pid)`: the test fails. |
 | AC2 | `defaults write … com.apple.Music '{volume=0.3;}'`; log shows `com.apple.Music … ratio=0.30` (±0.02) and Safari has no engine. | In `AppTapEngine` render, skip the gain multiply: ratio reads 1.00. |
 | AC3 | `{muted=1;}`: log `out=0.000`, Safari still audible. | Mute maps to gain 1 instead of 0: out ≠ 0. |
-| AC4 | Entry removed: `taps=0` in the log. Runner case `ownership untouched`. | Ownership returns `.statusRing` for no entry: runner fails, log shows `taps=1`. |
-| AC5 | `{outputUID="<MacBook speakers UID>";}` with EMBERTON default: sound only from the MacBook. Then switch the MacBook speakers off by choosing a non-existing UID: falls back to EMBERTON; `defaults read` still shows the UID. Runner case `ownership missing route falls back`. | Fallback returns nil target: runner fails. |
-| AC6 | Quit Music and Status Ring, relaunch both, play: the log shows the saved gain within 3 s. Runner case `settings round trip`. | Drop the `outputUID` key in encode: round trip fails. |
-| AC7 | US-4x4 default, TascamVolume running with `--debug`: its log shows `app com.apple.Music gain=0.30`, Status Ring log shows no engine for Music and `handoff=active`. Switch default to EMBERTON: within 2 s Status Ring log shows the Music engine, TascamVolume rebuilds without the per-app tap. Runner case `ownership follow default to handoff device`. | Ownership ignores handoff: runner fails, and both logs show a Music tap. |
+| AC4 | Entry removed: `taps=0` in the log. Test `ownership untouched`. | Ownership returns `.statusRing` for no entry: test fails, log shows `taps=1`. |
+| AC5 | `{outputUID="<MacBook speakers UID>";}` with EMBERTON default: sound only from the MacBook. Then switch the MacBook speakers off by choosing a non-existing UID: falls back to EMBERTON; `defaults read` still shows the UID. Test `ownership missing route falls back`. | Fallback returns nil target: test fails. |
+| AC6 | Quit Music and Status Ring, relaunch both, play: the log shows the saved gain within 3 s. Test `settings round trip`. | Drop the `outputUID` key in encode: round trip fails. |
+| AC7 | US-4x4 default, TascamVolume running with `--debug`: its log shows `app com.apple.Music gain=0.30`, Status Ring log shows no engine for Music and `handoff=active`. Switch default to EMBERTON: within 2 s Status Ring log shows the Music engine, TascamVolume rebuilds without the per-app tap. Test `ownership follow default to handoff device`. | Ownership ignores handoff: test fails, and both logs show a Music tap. |
 | AC8 | `kill -9 $(pgrep -x StatusRing)` while Music is at 30 %: Music back at full level on its original output (Jurek listens, or `TascamVolume --debug` input peak for Music returns to the unscaled level). Restart via `open /Applications/StatusRing.app`. | none (property of macOS). |
 | AC9 | `grep -n "@available(macOS 14.2" DuoBar` covers `AppTapEngine`, `AppAudioService`, `AppAudioStore`, `AppVolumePanelView`; build still targets `macos13.0` (`grep -n macos13.0 build-local.sh`). No macOS 13 machine available: mark "unverified on 13, compile-gated" in Progress. | Remove one `@available`: build fails with an availability error. |
 | AC10 | Manual pass with the installed app: master slider, volume keys with popover open, output switch, input switch, ⌘-drag reorder, the network detail panel. Screenshot. | none. |
 
-Whole-build checks before CP5: `tools/run-tests.sh` exit 0; `./build-local.sh` green and installed; `python3 ~/.claude/skills/unslop-ui/scripts/devibe_scan.py DuoBar/UI/AppVolumePanelView.swift --severity high` exit 0 (if the scanner does not handle Swift, note "scanner n/a for Swift" and do the unslop checklist by hand on the screenshot); TascamVolume `build.sh` green; Activity Monitor CPU for Status Ring with two engines running < 3 %.
+Whole-build checks before CP5: `./run-tests.sh` exit 0; `./build-local.sh` green and installed; `python3 ~/.claude/skills/unslop-ui/scripts/devibe_scan.py DuoBar/UI/AppVolumePanelView.swift --severity high` exit 0 (if the scanner does not handle Swift, note "scanner n/a for Swift" and do the unslop checklist by hand on the screenshot); TascamVolume `build.sh` green; Activity Monitor CPU for Status Ring with two engines running < 3 %.
 
 Done means: every AC either proven with evidence in Progress or explicitly marked "unverified" with the reason. An unverified AC7 or AC8 blocks the push of `tascam-volume`.
 
@@ -285,4 +285,4 @@ Sonnet review 2026-11-25 (full report: `plans/reports/plan-review.md`). Verdict 
 
 ## Progress
 
-(empty; the running session records state here)
+- 2026-11-25 (planning session): Xcode 27.2 test setup in place. `run-tests.sh` added; `LocalizationTests` updated for the DuoBar to Status Ring rename (4 keys). Baseline: 328 tests, 0 failures. CP0 still to run.

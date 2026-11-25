@@ -56,6 +56,15 @@ The check is one request to the GitHub API and nothing else. Turn it off in Sett
 
 The macOS 27 SDK needs Xcode's SwiftUI macros, so the script picks the newest 26.x (or older) SDK from the Command Line Tools. Override with `SDK=/path/to/MacOSX.sdk`. Version lives in `VERSION`.
 
+## Tests
+
+```
+./run-tests.sh                 # whole XCTest suite
+./run-tests.sh AppAudioTests   # one test class
+```
+
+Needs Xcode in `/Applications` (the build itself does not). The script sets `DEVELOPER_DIR`, so `xcode-select` can stay on the Command Line Tools.
+
 ## Privacy
 
 | What | Where it goes |
