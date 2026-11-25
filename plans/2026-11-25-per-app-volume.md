@@ -139,7 +139,7 @@ Each task owns its files. No two tasks in one checkpoint share a file.
 - **T4 Store + wiring** (after T2 and T3; lead hands it to one subagent)
   - Files: new `DuoBar/Models/AppAudioStore.swift`; edit `DuoBar/App/AppDelegate.swift` (create and stop the store, `--list-audio-apps` flag), `assets/Info.plist` (add `NSAudioCaptureUsageDescription`: "Status Ring reads an app's audio only to change its volume or send it to another output.").
   - Debug log: when `appAudioDebug` is true, log once per second per engine via `os_log` (subsystem `com.jurek.statusring`, category `appAudio`): `bundleID target=<uid> gain=<g> in=<peak> out=<peak> ratio=<out/in>`, plus `taps=<n>` overall.
-  - Until CP3, settings are set from the command line: `defaults write com.jurek.statusring appAudio -dict-add com.apple.Music '{volume=0.3;}'` followed by `notifyutil`-free path: the store also observes `UserDefaults.didChangeNotification` for its own domain.
+  - Until CP3, settings are set from the command line: `defaults write com.jurek.statusring appAudio -dict-add com.apple.Music '{volume=0.3;}'`. A `defaults write` from outside does not reliably fire `UserDefaults.didChangeNotification` in the running app, so the store also rereads `appAudio` once per second while `appAudioDebug` is true (debug only).
   - Proof (lead runs): AC2, AC3, AC4, AC5, AC8 via the debug log (see Proof).
 
 ### CP3: UI (waits for CP2: binds to `AppAudioStore`)
