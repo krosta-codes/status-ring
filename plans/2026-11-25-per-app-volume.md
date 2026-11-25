@@ -286,3 +286,4 @@ Sonnet review 2026-11-25 (full report: `plans/reports/plan-review.md`). Verdict 
 ## Progress
 
 - 2026-11-25 (planning session): Xcode 27.2 test setup in place. `run-tests.sh` added; `LocalizationTests` updated for the DuoBar to Status Ring rename (4 keys). Baseline: 328 tests, 0 failures. CP0 still to run.
+- 2026-11-25 (build session) CP0: "DuoBar Local Signing" listed by `security find-identity -p codesigning`; `./build-local.sh --no-install` green (2.0.0); `log stream --predicate 'subsystem == "com.jurek.statusring"'` runs. **US-4x4 not connected** (`system_profiler SPAudioDataType` lists MacBook Air Speakers default, BlackHole, aggregates): AC7 stays unverified and CP4 cannot close until Jurek plugs it in. CP1 to CP3 proceed. T1 handed to a Sonnet subagent.
