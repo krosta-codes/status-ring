@@ -108,7 +108,7 @@ final class AppAudioService {
     // MARK: One-shot discovery
 
     private typealias ResponsibleFn = @convention(c) (pid_t) -> pid_t
-    private nonisolated(unsafe) static let responsibleFn: ResponsibleFn? = {
+    private nonisolated static let responsibleFn: ResponsibleFn? = {
         guard let sym = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "responsibility_get_pid_responsible_for_pid") else {
             return nil
         }
@@ -130,7 +130,7 @@ final class AppAudioService {
         let infos: [AudioProcessInfo] = processObjects.compactMap { obj in
             guard let pid: pid_t = CAQuery.value(obj, kAudioProcessPropertyPID, initial: pid_t(0)), pid > 0 else { return nil }
             let running: UInt32 = CAQuery.value(obj, kAudioProcessPropertyIsRunningOutput, initial: UInt32(0)) ?? 0
-            return AudioProcessInfo(pid: pid, bundleID: CAQuery.string(obj, kAudioProcessPropertyBundleID),
+            return AudioProcessInfo(pid: pid, bundleID: CAQuery.string(obj, kAudioProcessPropertyBundleID).flatMap { $0.isEmpty ? nil : $0 },
                                     isPlaying: running != 0, objectID: obj)
         }
         let groups = AppAudioGrouping.group(
