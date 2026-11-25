@@ -147,3 +147,9 @@
 "%@ used" = "Занято %@";
 "Storage" = "Хранилище";
 "Available" = "Доступно";
+"App Volume" = "Громкость приложений";
+"No apps are playing audio" = "Нет приложений, воспроизводящих звук";
+"Follow default" = "Как в системе";
+"Reset" = "Сбросить";
+"Allow System Audio Recording" = "Разрешить запись системного звука";
+"Status Ring needs System Audio Recording to change an app's volume." = "Status Ring нужен доступ к записи системного звука, чтобы менять громкость приложения.";

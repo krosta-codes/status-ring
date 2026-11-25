@@ -6,6 +6,7 @@ struct VolumeStatusRow: View {
     let playbackDeviceIdentifier: String?
     let onSetVolume: (Double) -> Bool
     let onSetMuted: (Bool) -> Bool
+    var onShowApps: (() -> Void)? = nil
 
     @State private var feedbackInteraction = VolumeFeedbackInteraction()
 
@@ -49,6 +50,19 @@ struct VolumeStatusRow: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
                 }
+            }
+
+            if let onShowApps {
+                Button(action: onShowApps) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 22, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(localized("App Volume"))
+                .accessibilityLabel(localized("App Volume"))
             }
         }
         .padding(.horizontal, 8)

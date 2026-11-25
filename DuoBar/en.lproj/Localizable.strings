@@ -147,3 +147,9 @@
 "%@ used" = "%@ used";
 "Storage" = "Storage";
 "Available" = "Available";
+"App Volume" = "App Volume";
+"No apps are playing audio" = "No apps are playing audio";
+"Follow default" = "Follow default";
+"Reset" = "Reset";
+"Allow System Audio Recording" = "Allow System Audio Recording";
+"Status Ring needs System Audio Recording to change an app's volume." = "Status Ring needs System Audio Recording to change an app's volume.";

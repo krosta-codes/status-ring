@@ -137,4 +137,19 @@ final class AppAudioTests: XCTestCase {
             bundleIDForPID: { $0 == 7 ? "com.jurek.tascamvolume" : nil })
         XCTAssertEqual(groups.map(\.bundleID), ["a.b"])
     }
+
+    func testTascamHandoffDecoding() {
+        XCTAssertTrue(TascamHandoffDecoding.bool(true))
+        XCTAssertTrue(TascamHandoffDecoding.bool(1))
+        XCTAssertTrue(TascamHandoffDecoding.bool(" Yes "))
+        XCTAssertFalse(TascamHandoffDecoding.bool("0"))
+        XCTAssertFalse(TascamHandoffDecoding.bool(nil))
+        let on = TascamHandoffDecoding.state(running: true, handoff: 1, engineRunning: "true", deviceUID: "uid")
+        XCTAssertEqual(on, HandoffState(active: true, deviceUID: "uid"))
+        XCTAssertEqual(TascamHandoffDecoding.state(running: false, handoff: 1, engineRunning: 1, deviceUID: "uid"), .inactive)
+        XCTAssertEqual(TascamHandoffDecoding.state(running: true, handoff: 0, engineRunning: 1, deviceUID: "uid"), .inactive)
+        XCTAssertEqual(TascamHandoffDecoding.state(running: true, handoff: 1, engineRunning: 0, deviceUID: "uid"), .inactive)
+        XCTAssertEqual(TascamHandoffDecoding.tapped(["a", 3, "b"]), ["a", "b"])
+        XCTAssertEqual(TascamHandoffDecoding.tapped(nil), [])
+    }
 }

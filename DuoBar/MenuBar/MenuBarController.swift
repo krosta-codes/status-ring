@@ -77,7 +77,7 @@ final class MenuBarController: NSObject {
 
     private func configurePopover() {
         let hostingController = NSHostingController(
-            rootView: StatusPopoverView(statusStore: statusStore) { [weak self] in
+            rootView: StatusPopoverView(statusStore: statusStore, appAudioStore: appAudioStore) { [weak self] in
                 self?.closePopoverFromContent()
             }
         )

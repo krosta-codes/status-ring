@@ -147,3 +147,9 @@
 "%@ used" = "Зайнято %@";
 "Storage" = "Сховище";
 "Available" = "Доступно";
+"App Volume" = "Гучність програм";
+"No apps are playing audio" = "Жодна програма не відтворює звук";
+"Follow default" = "Як у системі";
+"Reset" = "Скинути";
+"Allow System Audio Recording" = "Дозволити запис системного звуку";
+"Status Ring needs System Audio Recording to change an app's volume." = "Status Ring потрібен доступ до запису системного звуку, щоб змінювати гучність програми.";

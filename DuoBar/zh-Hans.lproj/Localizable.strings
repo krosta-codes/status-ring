@@ -147,3 +147,9 @@
 "%@ used" = "已用 %@";
 "Storage" = "储存空间";
 "Available" = "可用";
+"App Volume" = "App 音量";
+"No apps are playing audio" = "没有正在播放音频的 App";
+"Follow default" = "跟随默认";
+"Reset" = "重置";
+"Allow System Audio Recording" = "允许录制系统音频";
+"Status Ring needs System Audio Recording to change an app's volume." = "Status Ring 需要“系统音频录制”权限才能调节 App 的音量。";

@@ -112,3 +112,9 @@
 "%@ used" = "ใช้ไป %@";
 "Storage" = "พื้นที่จัดเก็บ";
 "Available" = "ว่าง";
+"App Volume" = "ระดับเสียงแอป";
+"No apps are playing audio" = "ไม่มีแอปที่กำลังเล่นเสียง";
+"Follow default" = "ตามค่าเริ่มต้น";
+"Reset" = "รีเซ็ต";
+"Allow System Audio Recording" = "อนุญาตการบันทึกเสียงของระบบ";
+"Status Ring needs System Audio Recording to change an app's volume." = "Status Ring ต้องใช้การบันทึกเสียงของระบบเพื่อเปลี่ยนระดับเสียงของแอป";

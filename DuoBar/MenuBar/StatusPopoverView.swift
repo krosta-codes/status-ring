@@ -24,9 +24,12 @@ struct StatusPopoverView: View {
         onOrderChange: SystemStatTile.storeOrder
     )
     private let onClose: () -> Void
+    /// Type-erased `AppAudioStore` (macOS 14.2+); nil on older systems.
+    private let appAudioStore: AnyObject?
 
-    init(statusStore: SystemStatusStore, onClose: @escaping () -> Void) {
+    init(statusStore: SystemStatusStore, appAudioStore: AnyObject? = nil, onClose: @escaping () -> Void) {
         self.statusStore = statusStore
+        self.appAudioStore = appAudioStore
         self.onClose = onClose
     }
 
@@ -155,8 +158,10 @@ struct StatusPopoverView: View {
                 hasOutputDevice: statusStore.status.audio.defaultOutput != nil,
                 playbackDeviceIdentifier: statusStore.status.audio.defaultOutput?.uid,
                 onSetVolume: statusStore.setVolume,
-                onSetMuted: statusStore.setMuted
+                onSetMuted: statusStore.setMuted,
+                onShowApps: canShowAppVolume ? { showDetail(.apps) } : nil
             )
+            .matchedGeometryEffect(id: PopoverDetail.apps, in: detailNamespace)
         case .battery:
             Button(action: openBatterySettings) {
                 BatteryStatusRow(
@@ -272,6 +277,15 @@ struct StatusPopoverView: View {
         case network
         case output
         case input
+        case apps
+    }
+
+    /// App Volume needs process taps (macOS 14.2+) and a live store.
+    private var canShowAppVolume: Bool {
+        if #available(macOS 14.2, *) {
+            return appAudioStore is AppAudioStore
+        }
+        return false
     }
 
     private func showDetail(_ newDetail: PopoverDetail?) {
@@ -315,6 +329,10 @@ struct StatusPopoverView: View {
                 onBack: { showDetail(nil) },
                 onOpenSettings: openSoundSettings
             )
+        case .apps:
+            if #available(macOS 14.2, *), let store = appAudioStore as? AppAudioStore {
+                AppVolumePanelView(store: store, onBack: { showDetail(nil) })
+            }
         }
     }
 

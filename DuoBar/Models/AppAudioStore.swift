@@ -78,6 +78,7 @@ final class AppAudioStore: ObservableObject {
     private var wakeObserver: NSObjectProtocol?
     private var defaultsObserver: NSObjectProtocol?
     private var lastDebugSettingsRaw: NSDictionary?
+    private var handoffMonitor: TascamHandoffMonitor?
 
     // MARK: Lifecycle
 
@@ -124,12 +125,27 @@ final class AppAudioStore: ObservableObject {
             MainActor.assumeIsolated { self?.tick() }
         }
         updatePollTimer()
+
+        let monitor = TascamHandoffMonitor()
+        handoffMonitor = monitor
+        handoffReleaseReady = { [weak monitor] id in monitor?.tapped.contains(id) ?? false }
+        monitor.onChange = { [weak self] state, _ in
+            guard let self else { return }
+            // updateHandoff reconciles only when the state changed; a tapped-set change needs it too.
+            if state != self.handoff { self.updateHandoff(state) } else { self.reconcile() }
+        }
+        monitor.start()
+        handoff = monitor.state
         reconcile()
     }
 
     func stop() {
         guard started else { return }
         started = false
+        handoffMonitor?.stop()
+        handoffMonitor = nil
+        handoffReleaseReady = { _ in true }
+        handoff = .inactive
         tickTimer?.invalidate(); tickTimer = nil
         pollTimer?.invalidate(); pollTimer = nil
         if let wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver) }
@@ -291,7 +307,7 @@ final class AppAudioStore: ObservableObject {
                 if engines[id]?.targetUID != target { dropEngine(id) }
             }
         case .tascam:
-            // T8 plugs in here: keep our engine until TascamVolume reports the app in perAppTapped.
+            // Make before break: keep our engine until TascamVolume lists the app in perAppTapped.
             if engines[id] != nil, !handoffReleaseReady(id) { return }
             dropEngine(id)
         case .untouched:
@@ -387,8 +403,10 @@ final class AppAudioStore: ObservableObject {
             }
         }
         if debug {
+            let tappedList = (handoffMonitor?.tapped ?? []).sorted().joined(separator: ",")
             let line = "taps=\(engines.count) handoff=\(handoff.active ? "active" : "inactive") "
-                + "device=\(handoff.deviceUID ?? "none")"
+                + "device=\(handoff.deviceUID ?? "none") "
+                + "tascamTapped=\(tappedList.isEmpty ? "none" : tappedList)"
             os_log("%{public}@", log: Self.log, type: .default, line)
         }
         guard !engines.isEmpty else { return }
