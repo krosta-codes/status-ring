@@ -67,8 +67,10 @@ struct ControlIconBadge<Glyph: View>: View {
 /// Large glass module used for the detail views (Wi-Fi, audio devices),
 /// like the expanded Wi-Fi module in Control Center.
 struct ControlModuleBackground: ViewModifier {
+    var cornerRadius: CGFloat = 26
+
     func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 26, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         if #available(macOS 26.0, *) {
             content
                 .glassEffect(.regular, in: shape)

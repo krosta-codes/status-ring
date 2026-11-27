@@ -11,9 +11,12 @@ struct StatusPopoverView: View {
     @State private var mainContentSize: CGSize = .zero
     /// Links a row to its detail module so the row itself expands to the top
     /// and retracts back into its slot, like Control Center.
-    @Namespace private var detailNamespace
     /// Detail content fades in behind the surface growth (see `showDetail`).
     @State private var detailContentVisible = true
+    /// Global origin of the main content, to turn the cards' global frames into local ones.
+    @State private var mainContentOrigin: CGPoint = .zero
+    /// Frame of the card the open detail grew out of, in main-content coordinates.
+    @State private var zoomSource: CGRect?
     @ObservedObject private var commandKey = CommandKeyMonitor.shared
     @StateObject private var moduleOrder = ReorderController(
         axis: .vertical,
@@ -50,36 +53,44 @@ struct StatusPopoverView: View {
             // panel from resizing, like the Control Center detail views.
             ZStack {
                 if let detail {
-                    // The module's surface grows from the card into the panel. Its content
-                    // is laid out at the final size and pinned top-leading, so the growing
-                    // surface reveals it instead of stretching it, and it fades in just
-                    // behind the growth.
+                    // Zoom into the module: its surface grows out of the card's own frame
+                    // into the full panel (and shrinks back into it on close), so the motion
+                    // depends on where the card sits. The content is laid out at the final
+                    // size and pinned to the top of the surface, so it is revealed rather
+                    // than stretched, and fades in just behind the growth.
                     detailPanel(detail)
                         .padding(14)
-                        .frame(
-                            width: max(0, mainContentSize.width - 28),
-                            height: max(0, mainContentSize.height - 28),
-                            alignment: .top
-                        )
+                        .frame(width: detailRect.width, height: detailRect.height, alignment: .top)
                         .opacity(detailContentVisible ? 1 : 0)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                        .modifier(ControlModuleBackground())
-                        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-                        .matchedGeometryEffect(id: detail, in: detailNamespace)
-                        .padding(14)
-                        .frame(width: mainContentSize.width, height: mainContentSize.height)
-                        .transition(.opacity)
+                        // The transition's identity state is the settled panel; its active
+                        // state is the card the panel grows out of.
+                        .transition(.modifier(
+                            active: DetailSurfaceFrame(
+                                rect: zoomSource ?? detailRect,
+                                cornerRadius: PopoverCardBackground.cornerRadius,
+                                container: mainContentSize
+                            ),
+                            identity: DetailSurfaceFrame(
+                                rect: detailRect, cornerRadius: 26, container: mainContentSize
+                            )
+                        ))
+                        .zIndex(1)
                 } else {
                     panelContent
                         .background(
                             GeometryReader { proxy in
                                 Color.clear
-                                    .onAppear { mainContentSize = proxy.size }
+                                    .onAppear {
+                                        mainContentSize = proxy.size
+                                        mainContentOrigin = proxy.frame(in: .global).origin
+                                    }
                                     .onChange(of: proxy.size) { mainContentSize = $0 }
+                                    .onChange(of: proxy.frame(in: .global).origin) { mainContentOrigin = $0 }
                             }
                         )
-                        // The cards step back slightly as the panel comes forward.
-                        .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                        // The other cards zoom in towards the opened card as the camera moves
+                        // onto it, and zoom back out from it on close.
+                        .transition(.scale(scale: 1.12, anchor: zoomAnchor).combined(with: .opacity))
                 }
             }
         }
@@ -168,7 +179,6 @@ struct StatusPopoverView: View {
                 onActivate: { showDetail(.network) },
                 activationHint: localized("Browse nearby Wi-Fi networks")
             )
-            .matchedGeometryEffect(id: PopoverDetail.network, in: detailNamespace)
         case .volume:
             VolumeStatusRow(
                 volume: statusStore.status.audio.volume,
@@ -178,7 +188,6 @@ struct StatusPopoverView: View {
                 onSetMuted: statusStore.setMuted,
                 onShowApps: canShowAppVolume ? { showDetail(.apps) } : nil
             )
-            .matchedGeometryEffect(id: PopoverDetail.apps, in: detailNamespace)
         case .battery:
             Button(action: openBatterySettings) {
                 BatteryStatusRow(
@@ -219,7 +228,6 @@ struct StatusPopoverView: View {
                 onActivate: { showDetail(.output) },
                 activationHint: localized("Select audio output")
             )
-            .matchedGeometryEffect(id: PopoverDetail.output, in: detailNamespace)
         case .audioInput:
             StatusRow(
                 symbol: audioInputSymbol,
@@ -231,7 +239,6 @@ struct StatusPopoverView: View {
                 onActivate: { showDetail(.input) },
                 activationHint: localized("Select audio input")
             )
-            .matchedGeometryEffect(id: PopoverDetail.input, in: detailNamespace)
         }
     }
 
@@ -305,7 +312,33 @@ struct StatusPopoverView: View {
         return false
     }
 
+    /// The full panel rect the detail surface grows into (14 pt inset, as before).
+    private var detailRect: CGRect {
+        CGRect(x: 14, y: 14,
+               width: max(0, mainContentSize.width - 28), height: max(0, mainContentSize.height - 28))
+    }
+
+    /// Point the main content zooms towards: the centre of the opened card.
+    private var zoomAnchor: UnitPoint {
+        guard let r = zoomSource, mainContentSize.width > 0, mainContentSize.height > 0 else { return .center }
+        return UnitPoint(x: r.midX / mainContentSize.width, y: r.midY / mainContentSize.height)
+    }
+
+    private func module(for detail: PopoverDetail) -> PopoverModule {
+        switch detail {
+        case .network: return .network
+        case .output: return .audioOutput
+        case .input: return .audioInput
+        case .apps: return .volume
+        }
+    }
+
     private func showDetail(_ newDetail: PopoverDetail?) {
+        if let newDetail, detail == nil,
+           let global = moduleOrder.frames[module(for: newDetail)] {
+            // Set before the animated change so the transitions start from this card.
+            zoomSource = global.offsetBy(dx: -mainContentOrigin.x, dy: -mainContentOrigin.y)
+        }
         if newDetail != nil, detail == nil {
             detailContentVisible = false
             DispatchQueue.main.async {
@@ -801,3 +834,21 @@ private struct DebugStatusSimulatorView: View {
     }
 }
 #endif
+
+/// Places the detail surface at `rect` inside the main-content box, with its glass and
+/// corner radius. Used as the identity and the active state of the zoom transition, so
+/// the surface interpolates between the card's frame and the full panel.
+private struct DetailSurfaceFrame: ViewModifier {
+    let rect: CGRect
+    let cornerRadius: CGFloat
+    let container: CGSize
+
+    func body(content: Content) -> some View {
+        content
+            .frame(width: rect.width, height: rect.height, alignment: .top)
+            .modifier(ControlModuleBackground(cornerRadius: cornerRadius))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .position(x: rect.midX, y: rect.midY)
+            .frame(width: container.width, height: container.height)
+    }
+}
