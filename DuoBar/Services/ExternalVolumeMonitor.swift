@@ -21,7 +21,9 @@ final class ExternalVolumeMonitor {
     static let request = Notification.Name("com.jurek.statusring.externalVolumeRequest")
 
     var onChange: (() -> Void)?
-    private var states: [String: ExternalVolume] = [:]
+    private var states: [String: ExternalVolume] = [:] {
+        didSet { updateWatchdog() }
+    }
     private var observer: NSObjectProtocol?
     private var terminateObserver: NSObjectProtocol?
     private var watchdog: Timer?
@@ -37,10 +39,6 @@ final class ExternalVolumeMonitor {
         terminateObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.dropStoppedControllers() }
-        }
-        // A controller killed without notice posts nothing: check while any level is shown.
-        watchdog = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.dropStoppedControllers() }
         }
         DistributedNotificationCenter.default().postNotificationName(
@@ -79,6 +77,22 @@ final class ExternalVolumeMonitor {
         guard let (uid, state) = Self.decode(info), states[uid] != state else { return }
         states[uid] = state
         onChange?()
+    }
+
+    /// A controller killed without notice posts nothing: check only while at least one is known.
+    private func updateWatchdog() {
+        guard observer != nil, !states.isEmpty else {
+            watchdog?.invalidate()
+            watchdog = nil
+            return
+        }
+        guard watchdog == nil else { return }
+        let timer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.dropStoppedControllers() }
+        }
+        timer.tolerance = 0.3
+        watchdog = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
 
     private func dropStoppedControllers() {

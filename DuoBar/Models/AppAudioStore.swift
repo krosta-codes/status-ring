@@ -57,7 +57,9 @@ final class AppAudioStore: ObservableObject {
 
     private var settings: [String: AppAudioSetting] = [:]
     private var audioApps: [AudioApp] = []
-    private var engines: [String: AppTapEngine] = [:]
+    private var engines: [String: AppTapEngine] = [:] {
+        didSet { updateTickTimer() }
+    }
     /// Engine signature (target + processes) that failed to start; not retried until something real changes.
     private var failed: [String: String] = [:]
     /// Apps whose tap delivered only zeros while playing; no engine until their settings change or restart.
@@ -133,9 +135,7 @@ final class AppAudioStore: ObservableObject {
             MainActor.assumeIsolated { self?.reloadSettingsIfChanged() }
         }
 
-        tickTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.tick() }
-        }
+        updateTickTimer()
         updatePollTimer()
 
         let monitor = TascamHandoffMonitor()
@@ -235,6 +235,7 @@ final class AppAudioStore: ObservableObject {
 
     private func reloadSettingsIfChanged() {
         guard started else { return }
+        updateTickTimer()
         let fresh = settingsStore.load()
         guard fresh != settings else { return }
         for key in Set(fresh.keys).union(settings.keys) where fresh[key] != settings[key] { settingChanged(key) }
@@ -410,9 +411,29 @@ final class AppAudioStore: ObservableObject {
         pollTimer?.invalidate()
         pollTimer = nil
         guard started, popoverVisible else { return }
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.service.refresh() }
         }
+        timer.tolerance = 0.3
+        pollTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    /// The 1 s tick (permission check, peaks, debug line) only has work while an engine exists or debug is on.
+    private func updateTickTimer() {
+        let needed = started && (!engines.isEmpty || UserDefaults.standard.bool(forKey: PreferenceKeys.appAudioDebug))
+        if !needed {
+            tickTimer?.invalidate()
+            tickTimer = nil
+            return
+        }
+        guard tickTimer == nil else { return }
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.tick() }
+        }
+        timer.tolerance = 0.2
+        tickTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
 
     private func tick() {

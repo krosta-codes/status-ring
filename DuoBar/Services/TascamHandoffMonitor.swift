@@ -72,22 +72,14 @@ final class TascamHandoffMonitor {
             }
         }
         refresh()
-        // A crash or kill -9 of TascamVolume posts nothing, and a LaunchAgent-started binary may not
-        // fire didTerminate: while the handoff is active, re-check once per second so Status Ring
-        // takes the app back within the 2 s of AC7.
-        watchdog = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self, self.state.active else { return }
-                self.refresh()
-            }
-        }
+        // The watchdog starts and stops with state.active (see updateWatchdog, called from refresh()).
+        updateWatchdog()
     }
 
     func stop() {
         guard running else { return }
         running = false
-        watchdog?.invalidate()
-        watchdog = nil
+        updateWatchdog()
         if let launchObserver { NSWorkspace.shared.notificationCenter.removeObserver(launchObserver) }
         if let terminateObserver { NSWorkspace.shared.notificationCenter.removeObserver(terminateObserver) }
         if let distributedObserver { DistributedNotificationCenter.default().removeObserver(distributedObserver) }
@@ -116,6 +108,28 @@ final class TascamHandoffMonitor {
         guard newState != state || newTapped != tapped else { return }
         state = newState
         tapped = newTapped
+        updateWatchdog()
         onChange?(newState, newTapped)
+    }
+
+    /// A crash or kill -9 of TascamVolume posts nothing, and a LaunchAgent-started binary may not fire
+    /// didTerminate: while the handoff is active, re-check once per second so Status Ring takes the
+    /// app back within the 2 s of AC7. While inactive there is nothing to take back, so no timer runs.
+    private func updateWatchdog() {
+        guard running, state.active else {
+            watchdog?.invalidate()
+            watchdog = nil
+            return
+        }
+        guard watchdog == nil else { return }
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.state.active else { return }
+                self.refresh()
+            }
+        }
+        timer.tolerance = 0.2
+        watchdog = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
 }
