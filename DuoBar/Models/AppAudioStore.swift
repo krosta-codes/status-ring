@@ -77,8 +77,13 @@ final class AppAudioStore: ObservableObject {
     private var pollTimer: Timer?
     private var wakeObserver: NSObjectProtocol?
     private var defaultsObserver: NSObjectProtocol?
+    private var appObservers: [NSObjectProtocol] = []
     private var lastDebugSettingsRaw: NSDictionary?
     private var handoffMonitor: TascamHandoffMonitor?
+
+    private static func isRegularApp(pid: pid_t) -> Bool {
+        NSRunningApplication(processIdentifier: pid)?.activationPolicy == .regular
+    }
 
     // MARK: Lifecycle
 
@@ -115,6 +120,13 @@ final class AppAudioStore: ObservableObject {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.rebuildAll() }
         }
+        for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
+            appObservers.append(NSWorkspace.shared.notificationCenter.addObserver(
+                forName: name, object: nil, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.reconcile() }
+            })
+        }
         defaultsObserver = NotificationCenter.default.addObserver(
             forName: UserDefaults.didChangeNotification, object: nil, queue: .main
         ) { [weak self] _ in
@@ -150,6 +162,8 @@ final class AppAudioStore: ObservableObject {
         pollTimer?.invalidate(); pollTimer = nil
         if let wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver) }
         if let defaultsObserver { NotificationCenter.default.removeObserver(defaultsObserver) }
+        for o in appObservers { NSWorkspace.shared.notificationCenter.removeObserver(o) }
+        appObservers = []
         wakeObserver = nil
         defaultsObserver = nil
         for l in systemListeners { remove(l) }
@@ -259,12 +273,23 @@ final class AppAudioStore: ObservableObject {
             } else {
                 owner = .untouched
             }
-            if app.isPlaying || setting != nil {
+            if app.isPlaying || setting != nil || Self.isRegularApp(pid: app.pid) {
                 rows.append(AppAudioRow(id: app.bundleID, name: app.name, icon: app.icon,
                                         isPlaying: app.isPlaying, setting: setting ?? AppAudioSetting(),
                                         owner: owner))
             }
             applyEngine(for: app, owner: owner, setting: setting)
+        }
+
+        // Every other running regular app (Dock icon) is listed too, dimmed, so it can be set before it
+        // plays. It gets an engine only once it has audio process objects (macOS cannot tap earlier).
+        for running in NSWorkspace.shared.runningApplications where running.activationPolicy == .regular {
+            guard let bundleID = running.bundleIdentifier, !seen.contains(bundleID),
+                  !Self.excludedBundleIDs.contains(bundleID) else { continue }
+            seen.insert(bundleID)
+            let setting = settings[bundleID]
+            rows.append(AppAudioRow(id: bundleID, name: running.localizedName ?? bundleID, icon: running.icon,
+                                    isPlaying: false, setting: setting ?? AppAudioSetting(), owner: .untouched))
         }
 
         // Apps that left the process list: drop their engines.

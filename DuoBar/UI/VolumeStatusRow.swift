@@ -67,6 +67,9 @@ struct VolumeStatusRow: View {
         }
         .padding(.horizontal, 8)
         .frame(height: 58)
+        // The whole card opens App Volume; the slider and the mute button keep their own clicks.
+        .contentShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+        .onTapGesture { onShowApps?() }
         .popoverCardBackground(cornerRadius: 11, fillOpacity: 0.045)
     }
 
