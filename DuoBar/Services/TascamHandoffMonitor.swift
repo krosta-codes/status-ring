@@ -44,6 +44,7 @@ final class TascamHandoffMonitor {
     private var launchObserver: NSObjectProtocol?
     private var terminateObserver: NSObjectProtocol?
     private var distributedObserver: NSObjectProtocol?
+    private var watchdog: Timer?
     private var running = false
 
     func start() {
@@ -71,11 +72,22 @@ final class TascamHandoffMonitor {
             }
         }
         refresh()
+        // A crash or kill -9 of TascamVolume posts nothing, and a LaunchAgent-started binary may not
+        // fire didTerminate: while the handoff is active, re-check once per second so Status Ring
+        // takes the app back within the 2 s of AC7.
+        watchdog = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.state.active else { return }
+                self.refresh()
+            }
+        }
     }
 
     func stop() {
         guard running else { return }
         running = false
+        watchdog?.invalidate()
+        watchdog = nil
         if let launchObserver { NSWorkspace.shared.notificationCenter.removeObserver(launchObserver) }
         if let terminateObserver { NSWorkspace.shared.notificationCenter.removeObserver(terminateObserver) }
         if let distributedObserver { DistributedNotificationCenter.default().removeObserver(distributedObserver) }
