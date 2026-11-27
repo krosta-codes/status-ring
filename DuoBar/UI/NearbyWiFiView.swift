@@ -39,6 +39,7 @@ struct NearbyWiFiPanelView: View {
 
                 Text(localized("Wi-Fi"))
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .panelTitle()
 
                 if controller.state == .scanning {
                     ProgressView()

@@ -21,6 +21,7 @@ struct AppVolumePanelView: View {
 
                 Text(localized("App Volume"))
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .panelTitle()
 
                 Spacer()
             }

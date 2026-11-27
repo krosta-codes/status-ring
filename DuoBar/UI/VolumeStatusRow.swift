@@ -22,6 +22,7 @@ struct VolumeStatusRow: View {
                         .font(.system(size: 13, weight: .semibold))
                         .lineLimit(1)
                         .minimumScaleFactor(0.82)
+                        .cardTitle(localized("Volume"))
                     Spacer()
                     Text(stateText)
                         .font(.system(size: 10.5, weight: .medium, design: .rounded))

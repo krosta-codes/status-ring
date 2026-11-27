@@ -19,6 +19,10 @@ struct StatusPopoverView: View {
     @State private var zoomSource: CGRect?
     /// False while the detail surface sits on its card (start of an open, end of a close).
     @State private var detailExpanded = false
+    /// True while one copy of the section title flies between the card and the panel header.
+    @State private var titleFlying = false
+    @State private var cardTitleFrames: [String: CGRect] = [:]
+    @State private var panelTitleFrame: CGRect?
     @ObservedObject private var commandKey = CommandKeyMonitor.shared
     @StateObject private var moduleOrder = ReorderController(
         axis: .vertical,
@@ -66,7 +70,10 @@ struct StatusPopoverView: View {
                                         mainContentOrigin = proxy.frame(in: .global).origin
                                     }
                                     .onChange(of: proxy.size) { mainContentSize = $0 }
-                                    .onChange(of: proxy.frame(in: .global).origin) { mainContentOrigin = $0 }
+                                    // Only at rest: while zooming, the cards report scaled frames.
+                                    .onChange(of: proxy.frame(in: .global).origin) { origin in
+                                        if detail == nil { mainContentOrigin = origin }
+                                    }
                             }
                         )
                         .transition(.scale(scale: 1.12, anchor: zoomAnchor).combined(with: .opacity))
@@ -80,8 +87,11 @@ struct StatusPopoverView: View {
                     // pinned to the top, so it is revealed rather than stretched.
                     detailPanel(detail)
                         .padding(14)
-                        .frame(width: detailRect.width, height: detailRect.height, alignment: .top)
+                        .coordinateSpace(name: DetailTitleSpace.name)
+                        // The options pop up: from transparent and slightly low to in place.
                         .opacity(detailContentVisible ? 1 : 0)
+                        .offset(y: detailContentVisible ? 0 : 8)
+                        .frame(width: detailRect.width, height: detailRect.height, alignment: .top)
                         .modifier(DetailSurfaceFrame(
                             rect: detailExpanded ? detailRect : (zoomSource ?? detailRect),
                             cornerRadius: detailExpanded ? 26 : PopoverCardBackground.cornerRadius,
@@ -91,11 +101,34 @@ struct StatusPopoverView: View {
                         .zIndex(1)
                 }
             }
+            .environment(\.hiddenCardTitle, titleFlying ? detail.map(cardTitle(for:)) : nil)
+            .environment(\.panelTitleHidden, titleFlying)
+            .onPreferenceChange(CardTitleFrameKey.self) { frames in
+                MainActor.assumeIsolated { if !frames.isEmpty { cardTitleFrames = frames } }
+            }
+            .onPreferenceChange(PanelTitleFrameKey.self) { frame in
+                // Only once landed: mid-animation the header reports transient frames.
+                MainActor.assumeIsolated {
+                    if let frame, !titleFlying, detailExpanded {
+                        panelTitleFrame = frame
+                    }
+                }
+            }
+        }
+        // Outside the glass container: glass draws above any sibling inside it.
+        .overlay {
+            GeometryReader { proxy in
+                if titleFlying, let detail {
+                    flyingTitle(for: detail, containerOrigin: proxy.frame(in: .global).origin)
+                }
+            }
+            .allowsHitTesting(false)
         }
         .onChange(of: presentation.isShown) { isShown in
             if !isShown {
                 detail = nil
                 detailExpanded = false
+                titleFlying = false
                 presentation.isDetailOpen = false
             }
         }
@@ -332,6 +365,49 @@ struct StatusPopoverView: View {
         }
     }
 
+    private func cardTitle(for detail: PopoverDetail) -> String {
+        switch detail {
+        case .network: return localized("Network")
+        case .output: return localized("Audio Output")
+        case .input: return localized("Audio Input")
+        case .apps: return localized("Volume")
+        }
+    }
+
+    private func panelTitle(for detail: PopoverDetail) -> String {
+        switch detail {
+        case .network: return localized("Wi-Fi")
+        case .output: return localized("Audio Output")
+        case .input: return localized("Audio Input")
+        case .apps: return localized("App Volume")
+        }
+    }
+
+    /// One copy of the section title, flying from the card's title to the panel header (and
+    /// back on close) while the surface grows. Where the wording differs (Volume to App Volume)
+    /// the two cross-fade in flight.
+    private func flyingTitle(for detail: PopoverDetail, containerOrigin: CGPoint) -> some View {
+        // Everything in the overlay's own coordinates (global minus its origin).
+        let card = cardTitleFrames[cardTitle(for: detail)]
+            .map { $0.offsetBy(dx: -containerOrigin.x, dy: -containerOrigin.y) }
+        let header = (panelTitleFrame ?? CGRect(x: 42, y: 17, width: 80, height: 16))
+            .offsetBy(dx: mainContentOrigin.x - containerOrigin.x + detailRect.minX,
+                      dy: mainContentOrigin.y - containerOrigin.y + detailRect.minY)
+        let at = detailExpanded ? header : (card ?? header)
+        return ZStack(alignment: .topLeading) {
+            Text(cardTitle(for: detail))
+                .font(.system(size: 13, weight: .semibold))
+                .opacity(detailExpanded ? 0 : 1)
+            Text(panelTitle(for: detail))
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .opacity(detailExpanded ? 1 : 0)
+        }
+        .lineLimit(1)
+        .fixedSize()
+        .offset(x: at.minX, y: at.minY)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
     private func showDetail(_ newDetail: PopoverDetail?) {
         presentation.isDetailOpen = newDetail != nil
         switch (detail, newDetail) {
@@ -345,14 +421,25 @@ struct StatusPopoverView: View {
             withTransaction(placement) {
                 detailContentVisible = false
                 detailExpanded = false
+                titleFlying = true
                 detail = opening
             }
             DispatchQueue.main.async {
                 withAnimation(PopoverMotion.detail) { detailExpanded = true }
                 withAnimation(PopoverMotion.detailContentIn) { detailContentVisible = true }
             }
+            // Hand over to the panel's own header once the title has landed.
+            DispatchQueue.main.asyncAfter(deadline: .now() + PopoverMotion.retractDuration) {
+                guard detail == opening, detailExpanded else { return }
+                var landing = Transaction()
+                landing.disablesAnimations = true
+                withTransaction(landing) { titleFlying = false }
+            }
         case (_?, nil):
             // Close: shrink back onto the card while the cards zoom back out, then remove.
+            var lift = Transaction()
+            lift.disablesAnimations = true
+            withTransaction(lift) { titleFlying = true }
             withAnimation(PopoverMotion.detailContentOut) { detailContentVisible = false }
             withAnimation(PopoverMotion.detail) { detailExpanded = false }
             let closing = detail
@@ -360,7 +447,10 @@ struct StatusPopoverView: View {
                 guard detail == closing, !detailExpanded else { return }
                 var removal = Transaction()
                 removal.disablesAnimations = true
-                withTransaction(removal) { detail = nil }
+                withTransaction(removal) {
+                    detail = nil
+                    titleFlying = false
+                }
             }
         default:
             detail = newDetail

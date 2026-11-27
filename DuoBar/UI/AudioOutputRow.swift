@@ -30,6 +30,7 @@ struct AudioDevicePanelView: View {
 
                 Text(title)
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .panelTitle()
 
                 Spacer()
             }

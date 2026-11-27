@@ -91,6 +91,7 @@ struct StatusRow: View {
                     .font(.system(size: 13, weight: .semibold))
                     .lineLimit(1)
                     .fixedSize()
+                    .cardTitle(title)
                 HStack(spacing: 6) {
                     Text(detail)
                         .font(.system(size: 10.5))
