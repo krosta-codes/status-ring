@@ -17,6 +17,8 @@ struct StatusPopoverView: View {
     @State private var mainContentOrigin: CGPoint = .zero
     /// Frame of the card the open detail grew out of, in main-content coordinates.
     @State private var zoomSource: CGRect?
+    /// False while the detail surface sits on its card (start of an open, end of a close).
+    @State private var detailExpanded = false
     @ObservedObject private var commandKey = CommandKeyMonitor.shared
     @StateObject private var moduleOrder = ReorderController(
         axis: .vertical,
@@ -52,30 +54,9 @@ struct StatusPopoverView: View {
             // removed while a detail panel is open; the measured size keeps the
             // panel from resizing, like the Control Center detail views.
             ZStack {
-                if let detail {
-                    // Zoom into the module: its surface grows out of the card's own frame
-                    // into the full panel (and shrinks back into it on close), so the motion
-                    // depends on where the card sits. The content is laid out at the final
-                    // size and pinned to the top of the surface, so it is revealed rather
-                    // than stretched, and fades in just behind the growth.
-                    detailPanel(detail)
-                        .padding(14)
-                        .frame(width: detailRect.width, height: detailRect.height, alignment: .top)
-                        .opacity(detailContentVisible ? 1 : 0)
-                        // The transition's identity state is the settled panel; its active
-                        // state is the card the panel grows out of.
-                        .transition(.modifier(
-                            active: DetailSurfaceFrame(
-                                rect: zoomSource ?? detailRect,
-                                cornerRadius: PopoverCardBackground.cornerRadius,
-                                container: mainContentSize
-                            ),
-                            identity: DetailSurfaceFrame(
-                                rect: detailRect, cornerRadius: 26, container: mainContentSize
-                            )
-                        ))
-                        .zIndex(1)
-                } else {
+                // The cards stay while the surface sits on its card (start of an open,
+                // end of a close), so they can zoom in towards it and back out of it.
+                if detail == nil || !detailExpanded {
                     panelContent
                         .background(
                             GeometryReader { proxy in
@@ -88,15 +69,33 @@ struct StatusPopoverView: View {
                                     .onChange(of: proxy.frame(in: .global).origin) { mainContentOrigin = $0 }
                             }
                         )
-                        // The other cards zoom in towards the opened card as the camera moves
-                        // onto it, and zoom back out from it on close.
                         .transition(.scale(scale: 1.12, anchor: zoomAnchor).combined(with: .opacity))
+                }
+                if let detail {
+                    // Zoom into the module: the surface is placed exactly on the opened card,
+                    // then animates to the full panel; on close it animates back onto that
+                    // card before it is removed. Driven by state, not by insert/remove
+                    // transitions, because the glass container animates removed glass its own
+                    // way (it shrank to the centre). The content is laid out at the final size,
+                    // pinned to the top, so it is revealed rather than stretched.
+                    detailPanel(detail)
+                        .padding(14)
+                        .frame(width: detailRect.width, height: detailRect.height, alignment: .top)
+                        .opacity(detailContentVisible ? 1 : 0)
+                        .modifier(DetailSurfaceFrame(
+                            rect: detailExpanded ? detailRect : (zoomSource ?? detailRect),
+                            cornerRadius: detailExpanded ? 26 : PopoverCardBackground.cornerRadius,
+                            container: mainContentSize
+                        ))
+                        .transition(.identity)
+                        .zIndex(1)
                 }
             }
         }
         .onChange(of: presentation.isShown) { isShown in
             if !isShown {
                 detail = nil
+                detailExpanded = false
                 presentation.isDetailOpen = false
             }
         }
@@ -334,21 +333,38 @@ struct StatusPopoverView: View {
     }
 
     private func showDetail(_ newDetail: PopoverDetail?) {
-        if let newDetail, detail == nil,
-           let global = moduleOrder.frames[module(for: newDetail)] {
-            // Set before the animated change so the transitions start from this card.
-            zoomSource = global.offsetBy(dx: -mainContentOrigin.x, dy: -mainContentOrigin.y)
-        }
-        if newDetail != nil, detail == nil {
-            detailContentVisible = false
+        presentation.isDetailOpen = newDetail != nil
+        switch (detail, newDetail) {
+        case (nil, let opening?):
+            // Open: place the surface on the card without animation, then grow it.
+            if let global = moduleOrder.frames[module(for: opening)] {
+                zoomSource = global.offsetBy(dx: -mainContentOrigin.x, dy: -mainContentOrigin.y)
+            }
+            var placement = Transaction()
+            placement.disablesAnimations = true
+            withTransaction(placement) {
+                detailContentVisible = false
+                detailExpanded = false
+                detail = opening
+            }
             DispatchQueue.main.async {
+                withAnimation(PopoverMotion.detail) { detailExpanded = true }
                 withAnimation(PopoverMotion.detailContentIn) { detailContentVisible = true }
             }
-        }
-        withAnimation(PopoverMotion.detail) {
+        case (_?, nil):
+            // Close: shrink back onto the card while the cards zoom back out, then remove.
+            withAnimation(PopoverMotion.detailContentOut) { detailContentVisible = false }
+            withAnimation(PopoverMotion.detail) { detailExpanded = false }
+            let closing = detail
+            DispatchQueue.main.asyncAfter(deadline: .now() + PopoverMotion.retractDuration) {
+                guard detail == closing, !detailExpanded else { return }
+                var removal = Transaction()
+                removal.disablesAnimations = true
+                withTransaction(removal) { detail = nil }
+            }
+        default:
             detail = newDetail
         }
-        presentation.isDetailOpen = newDetail != nil
     }
 
     @ViewBuilder

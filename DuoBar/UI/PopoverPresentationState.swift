@@ -6,7 +6,7 @@ enum PopoverMotion {
     /// Spring used when a module expands into or retracts from its detail view.
     static let detail = Animation.spring(duration: 0.46, bounce: 0.08)
     /// Time to wait for a retract before the popover starts fading.
-    static let retractDuration: Double = 0.38
+    static let retractDuration: Double = 0.42
     static let openOpacity = Animation.easeOut(duration: 0.26)
     static let openBlur = Animation.easeOut(duration: 0.30).delay(0.02)
     static let close = Animation.linear(duration: closeDuration)
@@ -14,6 +14,7 @@ enum PopoverMotion {
     static let openSettle = Animation.spring(duration: 0.32, bounce: 0.1)
     /// Detail content waits for the surface to grow, then fades in.
     static let detailContentIn = Animation.easeOut(duration: 0.22).delay(0.14)
+    static let detailContentOut = Animation.easeIn(duration: 0.12)
 }
 
 /// Drives the blur + fade used when the popover panel opens and closes.
