@@ -12,6 +12,8 @@ struct StatusPopoverView: View {
     /// Links a row to its detail module so the row itself expands to the top
     /// and retracts back into its slot, like Control Center.
     @Namespace private var detailNamespace
+    /// Detail content fades in behind the surface growth (see `showDetail`).
+    @State private var detailContentVisible = true
     @ObservedObject private var commandKey = CommandKeyMonitor.shared
     @StateObject private var moduleOrder = ReorderController(
         axis: .vertical,
@@ -48,9 +50,19 @@ struct StatusPopoverView: View {
             // panel from resizing, like the Control Center detail views.
             ZStack {
                 if let detail {
+                    // The module's surface grows from the card into the panel. Its content
+                    // is laid out at the final size and pinned top-leading, so the growing
+                    // surface reveals it instead of stretching it, and it fades in just
+                    // behind the growth.
                     detailPanel(detail)
                         .padding(14)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .frame(
+                            width: max(0, mainContentSize.width - 28),
+                            height: max(0, mainContentSize.height - 28),
+                            alignment: .top
+                        )
+                        .opacity(detailContentVisible ? 1 : 0)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .modifier(ControlModuleBackground())
                         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
                         .matchedGeometryEffect(id: detail, in: detailNamespace)
@@ -66,7 +78,8 @@ struct StatusPopoverView: View {
                                     .onChange(of: proxy.size) { mainContentSize = $0 }
                             }
                         )
-                        .transition(.opacity)
+                        // The cards step back slightly as the panel comes forward.
+                        .transition(.opacity.combined(with: .scale(scale: 0.97)))
                 }
             }
         }
@@ -83,6 +96,10 @@ struct StatusPopoverView: View {
         .animation(presentation.isShown ? PopoverMotion.openOpacity : PopoverMotion.close, value: presentation.isShown)
         .blur(radius: presentation.isShown ? 0 : presentation.hiddenBlur)
         .animation(presentation.isShown ? PopoverMotion.openBlur : PopoverMotion.close, value: presentation.isShown)
+        // Opening reads as dropping out of the menu bar icon: a short settle downward from the top edge.
+        .scaleEffect(presentation.isShown ? 1 : 0.96, anchor: .top)
+        .offset(y: presentation.isShown ? 0 : -8)
+        .animation(presentation.isShown ? PopoverMotion.openSettle : PopoverMotion.close, value: presentation.isShown)
     }
 
     private var panelContent: some View {
@@ -289,6 +306,12 @@ struct StatusPopoverView: View {
     }
 
     private func showDetail(_ newDetail: PopoverDetail?) {
+        if newDetail != nil, detail == nil {
+            detailContentVisible = false
+            DispatchQueue.main.async {
+                withAnimation(PopoverMotion.detailContentIn) { detailContentVisible = true }
+            }
+        }
         withAnimation(PopoverMotion.detail) {
             detail = newDetail
         }

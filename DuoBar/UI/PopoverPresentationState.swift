@@ -10,6 +10,10 @@ enum PopoverMotion {
     static let openOpacity = Animation.easeOut(duration: 0.26)
     static let openBlur = Animation.easeOut(duration: 0.30).delay(0.02)
     static let close = Animation.linear(duration: closeDuration)
+    /// Popover settling from the menu bar on open.
+    static let openSettle = Animation.spring(duration: 0.32, bounce: 0.1)
+    /// Detail content waits for the surface to grow, then fades in.
+    static let detailContentIn = Animation.easeOut(duration: 0.2).delay(0.1)
 }
 
 /// Drives the blur + fade used when the popover panel opens and closes.

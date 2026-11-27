@@ -22,6 +22,12 @@ final class CommandKeyMonitor: ObservableObject {
 
 /// Order and drag state for one reorderable stack. Frames are in global
 /// coordinates so a nested stack can hand a cross-axis drag to its parent.
+///
+/// During a drag every slot is computed from a snapshot of the item sizes taken
+/// when the drag starts, never from live frames: the dragged item's live frame
+/// already contains its own offset (a feedback loop that made it jitter), and
+/// the other items' live frames are mid-animation after a swap (which made
+/// neighbours flip back and forth).
 @MainActor
 final class ReorderController<ID: Hashable>: ObservableObject {
     let axis: Axis
@@ -30,6 +36,10 @@ final class ReorderController<ID: Hashable>: ObservableObject {
     @Published private(set) var pointer: CGFloat = 0
     @Published private(set) var frames: [ID: CGRect] = [:]
     private var grab: CGFloat = 0
+    private var sizes: [ID: CGFloat] = [:]
+    private var origin: CGFloat = 0
+    private var gap: CGFloat = 0
+    private var orderAtStart: [ID] = []
     private let onOrderChange: ([ID]) -> Void
 
     init(axis: Axis, order: [ID], onOrderChange: @escaping ([ID]) -> Void) {
@@ -39,6 +49,9 @@ final class ReorderController<ID: Hashable>: ObservableObject {
     }
 
     func updateFrames(_ values: [AnyHashable: CGRect]) {
+        // Live frames are only needed to start a drag; skipping them during one
+        // also avoids a republish on every pointer move.
+        guard dragged == nil else { return }
         var next: [ID: CGRect] = [:]
         for (key, frame) in values {
             if let id = key.base as? ID { next[id] = frame }
@@ -49,42 +62,69 @@ final class ReorderController<ID: Hashable>: ObservableObject {
     /// Offset that keeps the dragged item under the pointer while the others
     /// animate into their new slots.
     func offset(for id: ID) -> CGFloat {
-        guard dragged == id, let frame = frames[id] else { return 0 }
-        return pointer - grab - leading(frame)
+        guard dragged == id else { return 0 }
+        return pointer - grab - slotLeading(id)
     }
 
     func dragChanged(_ id: ID, location: CGPoint, startLocation: CGPoint) {
-        guard let frame = frames[id] else { return }
         if dragged == nil {
-            dragged = id
+            guard let frame = frames[id], beginDrag() else { return }
             grab = coordinate(startLocation) - leading(frame)
+            pointer = coordinate(location)
+            dragged = id
         }
         guard dragged == id else { return }
         pointer = coordinate(location)
 
-        let target = order.filter { $0 != id }.filter { other in
-            guard let otherFrame = frames[other] else { return false }
-            return center(otherFrame) < pointer
-        }.count
+        // The dragged item takes the slot its centre is in. A neighbour's centre
+        // moves to the far side after a swap, so moving back needs a real move
+        // back (built-in hysteresis, no flip-flop at the boundary).
+        let draggedCenter = pointer - grab + (sizes[id] ?? 0) / 2
+        let target = order.filter { $0 != id }.filter { slotCenter($0) < draggedCenter }.count
         if let current = order.firstIndex(of: id), current != target {
-            withAnimation(.spring(duration: 0.28, bounce: 0.15)) {
+            withAnimation(.spring(duration: 0.3, bounce: 0.12)) {
                 order.remove(at: current)
                 order.insert(id, at: target)
             }
-            onOrderChange(order)
         }
     }
 
     func dragEnded() {
         guard dragged != nil else { return }
-        withAnimation(.spring(duration: 0.28, bounce: 0.15)) {
+        withAnimation(.spring(duration: 0.3, bounce: 0.12)) {
             dragged = nil
         }
+        // Persist once per drag instead of on every swap.
+        if order != orderAtStart { onOrderChange(order) }
     }
+
+    /// Snapshots sizes, the stack's leading edge and the spacing from the
+    /// resting layout. Returns false while frames are incomplete.
+    private func beginDrag() -> Bool {
+        let resting = order.compactMap { frames[$0] }
+        guard resting.count == order.count, let first = resting.first else { return false }
+        sizes = Dictionary(uniqueKeysWithValues: zip(order, resting.map(length)))
+        origin = leading(first)
+        gap = resting.count > 1 ? max(0, leading(resting[1]) - trailing(first)) : 0
+        orderAtStart = order
+        return true
+    }
+
+    private func slotLeading(_ id: ID) -> CGFloat {
+        var position = origin
+        for other in order {
+            if other == id { return position }
+            position += (sizes[other] ?? 0) + gap
+        }
+        return position
+    }
+
+    private func slotCenter(_ id: ID) -> CGFloat { slotLeading(id) + (sizes[id] ?? 0) / 2 }
 
     private func coordinate(_ point: CGPoint) -> CGFloat { axis == .vertical ? point.y : point.x }
     private func leading(_ frame: CGRect) -> CGFloat { axis == .vertical ? frame.minY : frame.minX }
-    private func center(_ frame: CGRect) -> CGFloat { axis == .vertical ? frame.midY : frame.midX }
+    private func trailing(_ frame: CGRect) -> CGFloat { axis == .vertical ? frame.maxY : frame.maxX }
+    private func length(_ frame: CGRect) -> CGFloat { axis == .vertical ? frame.height : frame.width }
 }
 
 struct ReorderFramesKey: PreferenceKey {
@@ -165,7 +205,16 @@ struct ReorderableStack<ID: Hashable, Content: View>: View {
                 y: controller.axis == .vertical ? offset : 0
             )
             .scaleEffect(controller.dragged == id ? 1.03 : 1)
+            // Lift and drop animate on their own; inside the transaction below.
+            .animation(.spring(duration: 0.22, bounce: 0.1), value: controller.dragged == id)
             .zIndex(controller.dragged == id ? 1 : 0)
+            // The dragged item follows the pointer; animating its slot change on a
+            // swap made it jump away and spring back under the cursor.
+            .transaction { transaction in
+                if controller.dragged == id, transaction.animation != nil, !transaction.disablesAnimations {
+                    transaction.animation = nil
+                }
+            }
     }
 
     private func dragGesture(for id: ID) -> some Gesture {
