@@ -19,6 +19,8 @@ final class SystemStatusStore: ObservableObject {
     private let batteryService: BatteryService
     private let networkService: NetworkService
     private let audioOutputService: AudioOutputService
+    private let externalVolume = ExternalVolumeMonitor()
+    private var latestAudio: AudioStatus?
     private let volumeKeyInterceptor = VolumeKeyInterceptor()
     private let bluetoothService: BluetoothService
     private let networkSpeedService = NetworkSpeedService()
@@ -104,8 +106,10 @@ final class SystemStatusStore: ObservableObject {
             #if DEBUG
             guard self?.debugAudioOverride == nil else { return }
             #endif
-            self?.mutate { $0.audio = value }
+            self?.latestAudio = value
+            self?.applyAudio()
         }
+        externalVolume.onChange = { [weak self] in self?.applyAudio() }
         bluetoothService.onStatusChange = { [weak self] value in
             #if DEBUG
             guard self?.debugBluetoothOverride == nil else { return }
@@ -117,8 +121,23 @@ final class SystemStatusStore: ObservableObject {
             batteryService.start()
             networkService.start()
             audioOutputService.start()
+            externalVolume.start()
             bluetoothService.start()
         }
+    }
+
+    /// Publishes the audio status, with the level of an app that controls the default
+    /// output (for example TascamVolume) when the device has no volume of its own.
+    private func applyAudio() {
+        #if DEBUG
+        guard debugAudioOverride == nil else { return }
+        #endif
+        guard var audio = latestAudio else { return }
+        if !audio.volume.isSettable, let ext = externalVolume.state(for: audio.defaultOutput?.uid) {
+            audio.volume.level = ext.level
+            audio.volume.isMuted = ext.muted
+        }
+        mutate { $0.audio = audio }
     }
 
     private static let developmentFullChargeDelay: LaptopAdaptiveFullChargeDelay = {
